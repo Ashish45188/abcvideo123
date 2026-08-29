@@ -1,0 +1,763 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { CreateVideoLinkInput, VideoLink, MediaType } from '../types';
+import { extractYouTubeVideoId, isValidYouTubeUrl, getYouTubeThumbnailUrl } from '../utils/youtube';
+import {
+  Link2,
+  Sparkles,
+  X,
+  AlertCircle,
+  CheckCircle2,
+  Play,
+  QrCode,
+  Copy,
+  Check,
+  Image as ImageIcon,
+  Film,
+  UploadCloud,
+  FileVideo,
+  FileImage,
+  RefreshCw,
+} from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+
+interface CreateVideoLinkModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (input: CreateVideoLinkInput) => Promise<VideoLink>;
+  baseUrl: string;
+}
+
+const PHOTO_PRESETS = [
+  {
+    name: '🏔 Alpine Mountain Panorama',
+    url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80',
+    desc: 'High-altitude panorama of jagged alpine peaks at golden hour.',
+  },
+  {
+    name: '🌆 Neon Cyberpunk Cityscape',
+    url: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1920&q=80',
+    desc: 'Futuristic urban night skyline with vibrant neon reflections.',
+  },
+  {
+    name: '🌴 Tropical Forest Waterfall',
+    url: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=1920&q=80',
+    desc: 'Lush tropical rainforest cascade surrounded by emerald foliage.',
+  },
+];
+
+const VIDEO_PRESETS = [
+  {
+    name: '🌊 Pacific Ocean Coastal Waves',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    desc: 'High-definition ocean swell and coastline scenery in 1080p.',
+  },
+  {
+    name: '🏎 High-Speed Racing Reel',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    desc: 'Dynamic cinematic footage stream.',
+  },
+  {
+    name: '🌿 Rainforest Wildlife Drone',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    desc: 'Aerial 4K drone sweep across canopy landscapes.',
+  },
+];
+
+const YOUTUBE_PRESETS = [
+  {
+    name: '🦜 Costa Rica 4K Wildlife Relaxation',
+    url: 'https://www.youtube.com/watch?v=LXb3EKWsInQ',
+    desc: 'Tropical wildlife and calming rainforest nature sounds.',
+  },
+  {
+    name: '🌌 Deep Space 4K Aurora Timelapse',
+    url: 'https://www.youtube.com/watch?v=1zxXZ9tqUf8',
+    desc: 'Cosmic auroral displays and celestial night sky captures.',
+  },
+];
+
+export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  baseUrl,
+}) => {
+  const [mediaType, setMediaType] = useState<MediaType>('photo');
+  const [photoInputMode, setPhotoInputMode] = useState<'upload' | 'url'>('upload');
+  const [videoInputMode, setVideoInputMode] = useState<'upload' | 'url'>('upload');
+
+  // Input states
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [directMediaUrl, setDirectMediaUrl] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [uploadedFileSize, setUploadedFileSize] = useState<string | null>(null);
+  const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
+
+  const [customName, setCustomName] = useState('');
+  const [description, setDescription] = useState('');
+  const [videoId, setVideoId] = useState<string | null>(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdLink, setCreatedLink] = useState<VideoLink | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // YouTube ID sync
+  useEffect(() => {
+    if (mediaType === 'youtube' && youtubeUrl) {
+      const id = extractYouTubeVideoId(youtubeUrl);
+      setVideoId(id);
+      if (id && !customName) {
+        setCustomName(`YouTube Video #${id.substring(0, 5)}`);
+      }
+    } else if (mediaType !== 'youtube') {
+      setVideoId(null);
+    }
+  }, [youtubeUrl, mediaType]);
+
+  if (!isOpen) return null;
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Size limit check: 25MB for video, 12MB for photo
+    const maxBytes = mediaType === 'photo' ? 12 * 1024 * 1024 : 35 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max allowed size is ${mediaType === 'photo' ? '12MB' : '35MB'}.`);
+      return;
+    }
+
+    setError(null);
+    setUploadedFileName(file.name);
+    setUploadedFileSize((file.size / (1024 * 1024)).toFixed(2) + ' MB');
+
+    if (!customName) {
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      setCustomName(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setDirectMediaUrl(result);
+      setPreviewMediaUrl(result);
+    };
+    reader.onerror = () => {
+      setError('Failed to read file from your device.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePresetSelect = (preset: { name: string; url: string; desc: string }) => {
+    setCustomName(preset.name);
+    setDescription(preset.desc);
+    if (mediaType === 'youtube') {
+      setYoutubeUrl(preset.url);
+    } else {
+      setDirectMediaUrl(preset.url);
+      setPreviewMediaUrl(preset.url);
+      setUploadedFileName('');
+      setUploadedFileSize(null);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!customName.trim()) {
+      setError('Please enter a title for the media link.');
+      return;
+    }
+
+    if (mediaType === 'youtube') {
+      if (!isValidYouTubeUrl(youtubeUrl)) {
+        setError('Please provide a valid YouTube URL (watch, share, shorts, or embed).');
+        return;
+      }
+    } else if (mediaType === 'photo') {
+      if (!directMediaUrl.trim()) {
+        setError('Please select an image file or provide a valid photo URL.');
+        return;
+      }
+    } else if (mediaType === 'video') {
+      if (!directMediaUrl.trim()) {
+        setError('Please select a video file or provide a valid video stream URL.');
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await onSubmit({
+        media_type: mediaType,
+        youtube_url: mediaType === 'youtube' ? youtubeUrl : undefined,
+        media_url: mediaType !== 'youtube' ? directMediaUrl : undefined,
+        thumbnail_url: mediaType === 'photo' ? directMediaUrl : undefined,
+        custom_name: customName,
+        description: description,
+      });
+      setCreatedLink(result);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to create link.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReset = () => {
+    setYoutubeUrl('');
+    setDirectMediaUrl('');
+    setPreviewMediaUrl(null);
+    setUploadedFileName('');
+    setUploadedFileSize(null);
+    setCustomName('');
+    setDescription('');
+    setVideoId(null);
+    setCreatedLink(null);
+    setError(null);
+  };
+
+  const shareUrl = createdLink ? `${baseUrl}?watch=${createdLink.share_id}` : '';
+
+  const handleCopy = () => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-[#121215] border border-[#222226] rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden font-sans max-h-[92vh] overflow-y-auto">
+        <button
+          onClick={() => {
+            handleReset();
+            onClose();
+          }}
+          className="absolute top-5 right-5 text-[#8E8E96] hover:text-white p-1.5 rounded-lg hover:bg-[#18181C] transition cursor-pointer z-10"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {createdLink ? (
+          /* SUCCESS STATE - Generated Link & QR Code */
+          <div className="space-y-6 animate-fadeIn">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 bg-[#18181C] text-[#D1FF26] rounded-2xl flex items-center justify-center mx-auto border border-[#2A2A30] shadow-lg">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold uppercase tracking-wider text-white font-mono">
+                {createdLink.media_type === 'photo'
+                  ? 'PHOTO TRACKING LINK READY'
+                  : createdLink.media_type === 'video'
+                  ? 'DIRECT VIDEO TRACKING LINK READY'
+                  : 'YOUTUBE TRACKING LINK READY'}
+              </h3>
+              <p className="text-xs text-[#8E8E96] font-mono">
+                Share this link with your visitor. Location consent will be required before opening.
+              </p>
+            </div>
+
+            {/* Media Badge Preview */}
+            <div className="bg-[#0A0A0B] p-3 rounded-2xl border border-[#222226] flex items-center gap-3 font-mono">
+              <div className="w-10 h-10 rounded-xl bg-[#141810] border border-[#304018] flex items-center justify-center text-[#D1FF26] shrink-0">
+                {createdLink.media_type === 'photo' ? (
+                  <ImageIcon className="w-5 h-5" />
+                ) : createdLink.media_type === 'video' ? (
+                  <Film className="w-5 h-5" />
+                ) : (
+                  <Play className="w-5 h-5 fill-current" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-bold text-[#D1FF26] uppercase tracking-widest block">
+                  {createdLink.media_type === 'photo'
+                    ? 'PROTECTED PHOTO'
+                    : createdLink.media_type === 'video'
+                    ? 'PROTECTED DIRECT VIDEO'
+                    : 'PROTECTED YOUTUBE'}
+                </span>
+                <p className="text-xs font-bold text-white truncate">{createdLink.custom_name}</p>
+              </div>
+            </div>
+
+            {/* QR Code Canvas */}
+            <div className="flex justify-center p-4 bg-white rounded-2xl border border-white/20 shadow-inner max-w-xs mx-auto">
+              <QRCodeSVG value={shareUrl} size={160} level="H" includeMargin={true} />
+            </div>
+
+            {/* Share URL Box */}
+            <div className="space-y-1.5 font-mono">
+              <label className="text-xs font-bold text-[#8E8E96] uppercase tracking-wider">
+                Shareable URL
+              </label>
+              <div className="flex items-center gap-2 bg-[#0A0A0B] rounded-xl p-2 border border-[#2A2A30]">
+                <input
+                  type="text"
+                  readOnly
+                  value={shareUrl}
+                  className="bg-transparent text-xs text-[#F0F0F2] flex-1 outline-none px-2 font-mono truncate"
+                />
+                <button
+                  onClick={handleCopy}
+                  className="px-3 py-1.5 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleReset}
+                className="flex-1 py-2.5 bg-[#18181C] hover:bg-[#222228] text-[#D0D0D5] rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition border border-[#2A2A30] cursor-pointer"
+              >
+                Create Another
+              </button>
+              <button
+                onClick={() => {
+                  handleReset();
+                  onClose();
+                }}
+                className="flex-1 py-2.5 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition cursor-pointer shadow-md"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* FORM STATE */
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#18181C] text-[#D1FF26] border border-[#2A2A30] flex items-center justify-center">
+                <Link2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold uppercase tracking-wider text-white font-mono">
+                  CREATE TRACKING LINK
+                </h3>
+                <p className="text-xs text-[#8E8E96] font-mono">
+                  Send a Photo, Direct Video, or YouTube stream
+                </p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-3 text-xs text-rose-200 flex items-center gap-2 font-mono">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Media Type Selector Tabs */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-bold text-[#D0D0D5] uppercase tracking-wider">
+                Select Media Type
+              </label>
+              <div className="grid grid-cols-3 gap-2 bg-[#0A0A0B] p-1 rounded-2xl border border-[#2A2A30]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaType('photo');
+                    setError(null);
+                  }}
+                  className={`py-2.5 px-3 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    mediaType === 'photo'
+                      ? 'bg-[#18181C] text-[#D1FF26] border border-[#304018] shadow-md'
+                      : 'text-[#8E8E96] hover:text-white'
+                  }`}
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  <span>Photo / Image</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaType('video');
+                    setError(null);
+                  }}
+                  className={`py-2.5 px-3 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    mediaType === 'video'
+                      ? 'bg-[#18181C] text-[#D1FF26] border border-[#304018] shadow-md'
+                      : 'text-[#8E8E96] hover:text-white'
+                  }`}
+                >
+                  <Film className="w-4 h-4" />
+                  <span>Direct Video</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaType('youtube');
+                    setError(null);
+                  }}
+                  className={`py-2.5 px-3 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                    mediaType === 'youtube'
+                      ? 'bg-[#18181C] text-[#D1FF26] border border-[#304018] shadow-md'
+                      : 'text-[#8E8E96] hover:text-white'
+                  }`}
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>YouTube</span>
+                </button>
+              </div>
+            </div>
+
+            {/* TAB 1: Photo / Image Config */}
+            {mediaType === 'photo' && (
+              <div className="space-y-4 bg-[#0E0E10] p-4 rounded-2xl border border-[#222226]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-[#D1FF26]" />
+                    Photo Source
+                  </span>
+                  <div className="flex bg-[#0A0A0B] p-0.5 rounded-lg border border-[#2A2A30] text-[11px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setPhotoInputMode('upload')}
+                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                        photoInputMode === 'upload' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
+                      }`}
+                    >
+                      Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoInputMode('url')}
+                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                        photoInputMode === 'url' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
+                      }`}
+                    >
+                      Image URL
+                    </button>
+                  </div>
+                </div>
+
+                {photoInputMode === 'upload' ? (
+                  <div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
+                        <UploadCloud className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                          Click to Browse or Drop Photo
+                        </p>
+                        <p className="text-[11px] text-[#8E8E96] font-mono">
+                          PNG, JPG, WebP or GIF (Up to 12MB)
+                        </p>
+                      </div>
+                      {uploadedFileName && (
+                        <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span className="truncate max-w-xs">{uploadedFileName}</span>
+                          <span className="text-[#8E8E96]">({uploadedFileSize})</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <input
+                      type="url"
+                      placeholder="https://example.com/image.jpg"
+                      value={directMediaUrl}
+                      onChange={(e) => {
+                        setDirectMediaUrl(e.target.value);
+                        setPreviewMediaUrl(e.target.value);
+                      }}
+                      className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* Quick Presets */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] font-mono text-[#8E8E96] uppercase tracking-wider block">
+                    Quick Sample Presets:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PHOTO_PRESETS.map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handlePresetSelect(p)}
+                        className="px-2.5 py-1 bg-[#0A0A0B] hover:bg-[#18181C] text-[#D0D0D5] hover:text-[#D1FF26] border border-[#2A2A30] rounded-lg text-[11px] font-mono transition cursor-pointer"
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Preview */}
+                {previewMediaUrl && (
+                  <div className="flex items-center gap-3 bg-[#0A0A0B] p-2.5 rounded-xl border border-[#2A2A30]">
+                    <img
+                      src={previewMediaUrl}
+                      alt="Preview"
+                      className="w-16 h-16 object-cover rounded-lg border border-[#222226]"
+                      onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
+                    />
+                    <div className="text-xs space-y-0.5 truncate font-mono">
+                      <span className="font-bold text-[#D1FF26] flex items-center gap-1 uppercase tracking-wider text-[11px]">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Photo Loaded &amp; Ready
+                      </span>
+                      <p className="text-[#8E8E96] text-[11px] font-mono truncate max-w-xs">
+                        {uploadedFileName || previewMediaUrl}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: Direct Video (MP4/WebM) Config */}
+            {mediaType === 'video' && (
+              <div className="space-y-4 bg-[#0E0E10] p-4 rounded-2xl border border-[#222226]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Film className="w-4 h-4 text-[#D1FF26]" />
+                    Direct Video Source (MP4 / WebM)
+                  </span>
+                  <div className="flex bg-[#0A0A0B] p-0.5 rounded-lg border border-[#2A2A30] text-[11px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setVideoInputMode('upload')}
+                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                        videoInputMode === 'upload' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
+                      }`}
+                    >
+                      Upload MP4
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVideoInputMode('url')}
+                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                        videoInputMode === 'url' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
+                      }`}
+                    >
+                      Video Stream URL
+                    </button>
+                  </div>
+                </div>
+
+                {videoInputMode === 'upload' ? (
+                  <div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="video/mp4, video/webm, video/ogg"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
+                        <FileVideo className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                          Click to Browse or Drop MP4 Video
+                        </p>
+                        <p className="text-[11px] text-[#8E8E96] font-mono">
+                          Standard MP4 or WebM video file (Up to 35MB)
+                        </p>
+                      </div>
+                      {uploadedFileName && (
+                        <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span className="truncate max-w-xs">{uploadedFileName}</span>
+                          <span className="text-[#8E8E96]">({uploadedFileSize})</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <input
+                      type="url"
+                      placeholder="https://example.com/video.mp4"
+                      value={directMediaUrl}
+                      onChange={(e) => {
+                        setDirectMediaUrl(e.target.value);
+                        setPreviewMediaUrl(e.target.value);
+                      }}
+                      className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* Quick Presets */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] font-mono text-[#8E8E96] uppercase tracking-wider block">
+                    Quick Sample Presets:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {VIDEO_PRESETS.map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handlePresetSelect(p)}
+                        className="px-2.5 py-1 bg-[#0A0A0B] hover:bg-[#18181C] text-[#D0D0D5] hover:text-[#D1FF26] border border-[#2A2A30] rounded-lg text-[11px] font-mono transition cursor-pointer"
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Preview */}
+                {previewMediaUrl && (
+                  <div className="bg-[#0A0A0B] p-2.5 rounded-xl border border-[#2A2A30] space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-mono text-[#D1FF26]">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span className="font-bold uppercase tracking-wider">Video Stream Preview:</span>
+                    </div>
+                    <video
+                      src={previewMediaUrl}
+                      controls
+                      playsInline
+                      className="w-full max-h-36 rounded-lg bg-black border border-[#222226] object-contain"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: YouTube Config */}
+            {mediaType === 'youtube' && (
+              <div className="space-y-4 bg-[#0E0E10] p-4 rounded-2xl border border-[#222226]">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Play className="w-3.5 h-3.5 fill-current text-[#D1FF26]" />
+                    YouTube URL <span className="text-[#D1FF26]">*</span>
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
+                  />
+                </div>
+
+                {/* Quick Presets */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-mono text-[#8E8E96] uppercase tracking-wider block">
+                    Quick Sample Presets:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {YOUTUBE_PRESETS.map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handlePresetSelect(p)}
+                        className="px-2.5 py-1 bg-[#0A0A0B] hover:bg-[#18181C] text-[#D0D0D5] hover:text-[#D1FF26] border border-[#2A2A30] rounded-lg text-[11px] font-mono transition cursor-pointer"
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* YouTube Video Preview Thumbnail */}
+                {videoId && (
+                  <div className="flex items-center gap-3 bg-[#0A0A0B] p-2.5 rounded-xl border border-[#2A2A30]">
+                    <img
+                      src={getYouTubeThumbnailUrl(videoId)}
+                      alt="Thumbnail"
+                      className="w-20 h-12 object-cover rounded-lg border border-[#222226]"
+                      onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
+                    />
+                    <div className="text-xs space-y-0.5 truncate font-mono">
+                      <span className="font-bold text-[#D1FF26] flex items-center gap-1 uppercase tracking-wider text-[11px]">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Valid YouTube Video
+                      </span>
+                      <p className="text-[#8E8E96] text-[11px] font-mono">ID: {videoId}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Field: Custom Title */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-bold text-[#D0D0D5] uppercase tracking-wider">
+                Title / Name <span className="text-[#D1FF26]">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. My Favorite Photo or Stream"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
+              />
+            </div>
+
+            {/* Field: Description */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-bold text-[#D0D0D5] uppercase tracking-wider">
+                Description <span className="text-[#71717A] text-[11px]">(Optional)</span>
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Short note or message displayed on the visitor consent screen..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition resize-none font-sans"
+              />
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3 px-4 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition duration-150 shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Sparkles className="w-4 h-4 text-black" />
+                )}
+                <span>
+                  {isSubmitting
+                    ? 'Generating Tracking Link...'
+                    : `Generate ${
+                        mediaType === 'photo'
+                          ? 'Photo'
+                          : mediaType === 'video'
+                          ? 'Direct Video'
+                          : 'YouTube'
+                      } Tracking Link`}
+                </span>
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};

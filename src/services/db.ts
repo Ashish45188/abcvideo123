@@ -1,0 +1,741 @@
+import { getSupabaseClient, getSupabaseConfig } from '../lib/supabase';
+import {
+  VideoLink,
+  VisitorSession,
+  LocationUpdate,
+  CurrentLocation,
+  SessionWithLocation,
+  CreateVideoLinkInput,
+  SessionStatus,
+  GeoLocationPayload,
+} from '../types';
+import { generateShareId } from '../utils/id';
+import { extractYouTubeVideoId } from '../utils/youtube';
+
+// --- Local Reactive Storage Adapter for zero-config offline/preview mode ---
+const LOCAL_LINKS_KEY = 'geovideo_local_video_links';
+const LOCAL_SESSIONS_KEY = 'geovideo_local_visitor_sessions';
+const LOCAL_UPDATES_KEY = 'geovideo_local_location_updates';
+const LOCAL_CURRENT_KEY = 'geovideo_local_current_locations';
+// Mobile browsers can pause timers while a tab is backgrounded. Keep a
+// generous grace period so an active share is not hidden during that pause.
+export const STALE_SESSION_THRESHOLD_MS = 30 * 60 * 1000;
+
+// BroadcastChannel for instant cross-tab sync in local mode
+const localChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
+  ? new BroadcastChannel('geovideo_realtime_sync')
+  : null;
+
+function getLocalData<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function setLocalData<T>(key: string, data: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+    if (localChannel) {
+      localChannel.postMessage({ type: 'DATA_UPDATED', key, timestamp: Date.now() });
+    }
+  } catch (e) {
+    console.error('Error saving local data:', e);
+  }
+}
+
+// Seed initial sample link if empty
+function initializeSeedDataIfNeeded() {
+  const existing = getLocalData<VideoLink[]>(LOCAL_LINKS_KEY, []);
+  if (existing.length === 0) {
+    const seedLinks: VideoLink[] = [
+      {
+        id: 'seed-link-1',
+        share_id: '4k8p2a9x',
+        custom_name: 'Nature 4K Relaxation - Wildlife in Costa Rica',
+        description: 'Experience stunning tropical wildlife and rainforest scenery.',
+        media_type: 'youtube',
+        youtube_url: 'https://www.youtube.com/watch?v=LXb3EKWsInQ',
+        youtube_video_id: 'LXb3EKWsInQ',
+        active: true,
+        created_at: new Date(Date.now() - 7200000).toISOString(),
+      },
+      {
+        id: 'seed-link-2',
+        share_id: 'ph9t7m2k',
+        custom_name: '4K Ultra HD Alpine Landscape Photo',
+        description: 'High-resolution panorama of the Swiss Alps with atmospheric peaks.',
+        media_type: 'photo',
+        media_url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80',
+        thumbnail_url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
+        active: true,
+        created_at: new Date(Date.now() - 3600000).toISOString(),
+      },
+      {
+        id: 'seed-link-3',
+        share_id: 'vd3w8x1y',
+        custom_name: 'Cinematic Ocean Waves Direct Stream',
+        description: 'Direct MP4 high-bitrate video stream of ocean tides and coastline.',
+        media_type: 'video',
+        media_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        thumbnail_url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
+        active: true,
+        created_at: new Date(Date.now() - 1800000).toISOString(),
+      },
+    ];
+    setLocalData(LOCAL_LINKS_KEY, seedLinks);
+  }
+}
+
+initializeSeedDataIfNeeded();
+
+// --- Database Service ---
+
+export const db = {
+  /**
+   * Video / Media Links
+   */
+  async getVideoLinks(): Promise<VideoLink[]> {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('video_links')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        return data as VideoLink[];
+      }
+      console.warn('Supabase getVideoLinks fallback to local:', error?.message);
+    }
+
+    const list = getLocalData<VideoLink[]>(LOCAL_LINKS_KEY, []);
+    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
+
+  async getVideoLinkByShareId(shareId: string): Promise<VideoLink | null> {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('video_links')
+        .select('*')
+        .eq('share_id', shareId)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as VideoLink;
+      }
+    }
+
+    const list = getLocalData<VideoLink[]>(LOCAL_LINKS_KEY, []);
+    return list.find((link) => link.share_id === shareId && link.active) || null;
+  },
+
+  async createVideoLink(input: CreateVideoLinkInput): Promise<VideoLink> {
+    const mediaType = input.media_type || 'youtube';
+    const shareId = generateShareId(8);
+    let newLink: VideoLink;
+
+    if (mediaType === 'youtube') {
+      const url = input.youtube_url || '';
+      const videoId = extractYouTubeVideoId(url);
+      if (!videoId) {
+        throw new Error('Invalid YouTube URL. Please provide a valid YouTube video link.');
+      }
+      newLink = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `link_${Date.now()}`,
+        share_id: shareId,
+        custom_name: input.custom_name.trim(),
+        description: input.description?.trim() || null,
+        media_type: 'youtube',
+        youtube_url: url.trim(),
+        youtube_video_id: videoId,
+        active: true,
+        created_at: new Date().toISOString(),
+      };
+    } else if (mediaType === 'photo') {
+      const photoUrl = input.media_url || '';
+      if (!photoUrl.trim()) {
+        throw new Error('Please select an image file or provide a valid image URL.');
+      }
+      newLink = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `link_${Date.now()}`,
+        share_id: shareId,
+        custom_name: input.custom_name.trim(),
+        description: input.description?.trim() || null,
+        media_type: 'photo',
+        media_url: photoUrl.trim(),
+        thumbnail_url: input.thumbnail_url?.trim() || photoUrl.trim(),
+        active: true,
+        created_at: new Date().toISOString(),
+      };
+    } else {
+      // mediaType === 'video'
+      const videoUrl = input.media_url || '';
+      if (!videoUrl.trim()) {
+        throw new Error('Please select a video file or provide a valid video stream URL.');
+      }
+      newLink = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `link_${Date.now()}`,
+        share_id: shareId,
+        custom_name: input.custom_name.trim(),
+        description: input.description?.trim() || null,
+        media_type: 'video',
+        media_url: videoUrl.trim(),
+        thumbnail_url: input.thumbnail_url?.trim() || null,
+        active: true,
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('video_links')
+        .insert({
+          share_id: newLink.share_id,
+          custom_name: newLink.custom_name,
+          description: newLink.description,
+          media_type: newLink.media_type,
+          media_url: newLink.media_url,
+          thumbnail_url: newLink.thumbnail_url,
+          youtube_url: newLink.youtube_url,
+          youtube_video_id: newLink.youtube_video_id,
+          active: true,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        return data as VideoLink;
+      }
+      console.warn('Supabase createVideoLink failed, storing locally:', error?.message);
+    }
+
+    const current = getLocalData<VideoLink[]>(LOCAL_LINKS_KEY, []);
+    setLocalData(LOCAL_LINKS_KEY, [newLink, ...current]);
+    return newLink;
+  },
+
+  async toggleVideoLinkStatus(id: string, active: boolean): Promise<void> {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.from('video_links').update({ active }).eq('id', id);
+    }
+
+    const current = getLocalData<VideoLink[]>(LOCAL_LINKS_KEY, []);
+    const updated = current.map((l) => (l.id === id ? { ...l, active } : l));
+    setLocalData(LOCAL_LINKS_KEY, updated);
+  },
+
+  async deleteVideoLink(id: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.from('video_links').delete().eq('id', id);
+    }
+
+    const current = getLocalData<VideoLink[]>(LOCAL_LINKS_KEY, []);
+    setLocalData(
+      LOCAL_LINKS_KEY,
+      current.filter((l) => l.id !== id)
+    );
+  },
+
+  async deleteVisitorSession(id: string): Promise<void> {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      // ON DELETE CASCADE on location_updates/current_locations takes care
+      // of clearing that session's telemetry automatically.
+      const { error } = await supabase.from('visitor_sessions').delete().eq('id', id);
+      if (error) {
+        throw new Error(`Failed to delete visitor session: ${error.message}`);
+      }
+    }
+
+    const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+    setLocalData(
+      LOCAL_SESSIONS_KEY,
+      sessions.filter((s) => s.id !== id)
+    );
+
+    const allUpdates = getLocalData<LocationUpdate[]>(LOCAL_UPDATES_KEY, []);
+    setLocalData(
+      LOCAL_UPDATES_KEY,
+      allUpdates.filter((u) => u.session_id !== id)
+    );
+
+    const allCurrent = getLocalData<Record<string, CurrentLocation>>(LOCAL_CURRENT_KEY, {});
+    delete allCurrent[id];
+    setLocalData(LOCAL_CURRENT_KEY, allCurrent);
+  },
+
+  /**
+   * Visitor Sessions
+   */
+  async createVisitorSession(
+    videoLinkId: string,
+    visitorId: string,
+    initialStatus: SessionStatus = 'active'
+  ): Promise<VisitorSession> {
+    const now = new Date().toISOString();
+
+    const supabase = getSupabaseClient();
+    if (supabase && initialStatus === 'active') {
+      // Reuse an existing live session for this exact visitor + link
+      // instead of creating a duplicate. Without this, every page
+      // reload / re-consent created a brand new overlapping "active"
+      // session, which made the Active Sessions list flicker as it
+      // kept jumping between several rows for the same visitor.
+      const { data: existing } = await supabase
+        .from('visitor_sessions')
+        .select('*')
+        .eq('video_link_id', videoLinkId)
+        .eq('visitor_id', visitorId)
+        .in('status', ['active', 'waiting', 'location_unavailable'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        const { data: refreshed } = await supabase
+          .from('visitor_sessions')
+          .update({ status: 'active', last_seen: now })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        return (refreshed || existing) as VisitorSession;
+      }
+    }
+
+    const newSession: VisitorSession = {
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `sess_${Date.now()}`,
+      video_link_id: videoLinkId,
+      visitor_id: visitorId,
+      status: initialStatus,
+      consent_given: initialStatus === 'active',
+      started_at: now,
+      last_seen: now,
+      created_at: now,
+    };
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('visitor_sessions')
+        .insert({
+          video_link_id: videoLinkId,
+          visitor_id: visitorId,
+          status: initialStatus,
+          consent_given: initialStatus === 'active',
+          started_at: newSession.started_at,
+          last_seen: newSession.last_seen,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        return data as VisitorSession;
+      }
+      console.warn('Supabase createVisitorSession fallback to local:', error?.message);
+    }
+
+    const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+    setLocalData(LOCAL_SESSIONS_KEY, [newSession, ...sessions]);
+    return newSession;
+  },
+
+  async getVisitorSession(sessionId: string): Promise<VisitorSession | null> {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('visitor_sessions')
+        .select('*, video_link:video_links(*)')
+        .eq('id', sessionId)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as VisitorSession;
+      }
+    }
+
+    const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return null;
+
+    const links = getLocalData<VideoLink[]>(LOCAL_LINKS_KEY, []);
+    const link = links.find((l) => l.id === session.video_link_id);
+    return { ...session, video_link: link };
+  },
+
+  async updateVisitorSessionStatus(
+    sessionId: string,
+    status: SessionStatus,
+    stopReason?: string
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const updates: Partial<VisitorSession> = {
+      status,
+      last_seen: now,
+    };
+
+    if (
+      status === 'stopped_by_visitor' ||
+      status === 'stopped_by_admin' ||
+      status === 'permission_denied' ||
+      status === 'location_unavailable' ||
+      status === 'expired'
+    ) {
+      updates.stopped_at = now;
+      if (stopReason) updates.stop_reason = stopReason;
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.from('visitor_sessions').update(updates).eq('id', sessionId);
+    }
+
+    const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+    const updated = sessions.map((s) => (s.id === sessionId ? { ...s, ...updates } : s));
+    setLocalData(LOCAL_SESSIONS_KEY, updated);
+  },
+
+  async touchVisitorSession(sessionId: string): Promise<void> {
+    const now = new Date().toISOString();
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { error } = await supabase
+        .from('visitor_sessions')
+        .update({ last_seen: now, status: 'active' })
+        .eq('id', sessionId)
+        .in('status', ['active', 'location_unavailable', 'waiting']);
+      if (error) {
+        console.warn('Failed to refresh visitor session heartbeat:', error.message);
+      }
+    }
+
+    const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+    const updated = sessions.map((s) =>
+      s.id === sessionId && ['active', 'location_unavailable', 'waiting'].includes(s.status)
+        ? { ...s, last_seen: now, status: 'active' }
+        : s
+    );
+    setLocalData(LOCAL_SESSIONS_KEY, updated);
+  },
+
+  async expireStaleSessions(): Promise<void> {
+    const cutoff = new Date(Date.now() - STALE_SESSION_THRESHOLD_MS).toISOString();
+    const now = new Date().toISOString();
+    const updates: Partial<VisitorSession> = {
+      status: 'expired',
+      stopped_at: now,
+      stop_reason: 'Session expired after no location updates',
+      last_seen: now,
+    };
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { error } = await supabase
+        .from('visitor_sessions')
+        .update(updates)
+        .eq('status', 'active')
+        .lt('last_seen', cutoff);
+
+      if (error) {
+        console.warn('Supabase stale-session cleanup failed:', error.message);
+      }
+    }
+
+    const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+    let changed = false;
+    const updated = sessions.map((session) => {
+      const lastSeen = session.last_seen || session.created_at;
+      if (session.status === 'active' && lastSeen < cutoff) {
+        changed = true;
+        return { ...session, ...updates };
+      }
+      return session;
+    });
+    if (changed) {
+      setLocalData(LOCAL_SESSIONS_KEY, updated);
+    }
+  },
+
+  /**
+   * Location Updates and Current Location
+   */
+  async updateCurrentLocation(sessionId: string, payload: GeoLocationPayload): Promise<void> {
+    const now = new Date().toISOString();
+    const currentRecord: CurrentLocation = {
+      session_id: sessionId,
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      accuracy: payload.accuracy,
+      altitude: payload.altitude,
+      altitude_accuracy: payload.altitudeAccuracy,
+      heading: payload.heading,
+      speed: payload.speed,
+      updated_at: now,
+    };
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { error } = await supabase
+        .from('current_locations')
+        .upsert(currentRecord, { onConflict: 'session_id' });
+      if (error) throw new Error(`Failed to update current location: ${error.message}`);
+      await this.touchVisitorSession(sessionId);
+      return;
+    }
+
+    const allCurrent = getLocalData<Record<string, CurrentLocation>>(LOCAL_CURRENT_KEY, {});
+    allCurrent[sessionId] = currentRecord;
+    setLocalData(LOCAL_CURRENT_KEY, allCurrent);
+    await this.touchVisitorSession(sessionId);
+  },
+
+  async recordLocationUpdate(
+    sessionId: string,
+    payload: GeoLocationPayload
+  ): Promise<{ updateId: string }> {
+    const now = new Date().toISOString();
+    const updateId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `upd_${Date.now()}`;
+
+    const updateRecord: LocationUpdate = {
+      id: updateId,
+      session_id: sessionId,
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      accuracy: payload.accuracy,
+      altitude: payload.altitude,
+      altitude_accuracy: payload.altitudeAccuracy,
+      heading: payload.heading,
+      speed: payload.speed,
+      created_at: now,
+    };
+
+    const currentRecord: CurrentLocation = {
+      session_id: sessionId,
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      accuracy: payload.accuracy,
+      altitude: payload.altitude,
+      altitude_accuracy: payload.altitudeAccuracy,
+      heading: payload.heading,
+      speed: payload.speed,
+      updated_at: now,
+    };
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      // 1. Insert into location_updates
+      await supabase.from('location_updates').insert(updateRecord);
+
+      // 2. Upsert into current_locations
+      await supabase.from('current_locations').upsert(currentRecord, { onConflict: 'session_id' });
+
+      // 3. Update session last_seen and self-heal status back to 'active'
+      // (a successful GPS fix means the visitor is sharing again, even if an
+      // earlier fix had timed out and flipped the status away from 'active')
+      await supabase
+        .from('visitor_sessions')
+        .update({ last_seen: now, status: 'active' })
+        .eq('id', sessionId)
+        .in('status', ['active', 'location_unavailable', 'waiting']);
+
+      return { updateId };
+    }
+
+    // Local fallback
+    const allUpdates = getLocalData<LocationUpdate[]>(LOCAL_UPDATES_KEY, []);
+    setLocalData(LOCAL_UPDATES_KEY, [...allUpdates, updateRecord]);
+
+    const allCurrent = getLocalData<Record<string, CurrentLocation>>(LOCAL_CURRENT_KEY, {});
+    allCurrent[sessionId] = currentRecord;
+    setLocalData(LOCAL_CURRENT_KEY, allCurrent);
+
+    // Update session last seen
+    const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+    setLocalData(
+      LOCAL_SESSIONS_KEY,
+      sessions.map((s) => (s.id === sessionId ? { ...s, last_seen: now } : s))
+    );
+
+    return { updateId };
+  },
+
+  async getActiveSessions(): Promise<SessionWithLocation[]> {
+    await this.expireStaleSessions();
+    const allSessions = await this.getAllSessions();
+    return allSessions.filter((s) => s.status === 'active');
+  },
+
+  async getAllSessions(): Promise<SessionWithLocation[]> {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data: sessions, error } = await supabase
+        .from('visitor_sessions')
+        .select(`
+          *,
+          video_link:video_links(*),
+          current_location:current_locations(*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (!error && sessions) {
+        return sessions.map((s: any) => ({
+          ...s,
+          current_location: Array.isArray(s.current_location)
+            ? s.current_location[0] || null
+            : s.current_location || null,
+        })) as SessionWithLocation[];
+      }
+    }
+
+    // Local fallback
+    const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+    const links = getLocalData<VideoLink[]>(LOCAL_LINKS_KEY, []);
+    const currentLocations = getLocalData<Record<string, CurrentLocation>>(LOCAL_CURRENT_KEY, {});
+    const updates = getLocalData<LocationUpdate[]>(LOCAL_UPDATES_KEY, []);
+
+    return sessions
+      .map((s) => {
+        const link = links.find((l) => l.id === s.video_link_id) || null;
+        const loc = currentLocations[s.id] || null;
+        const count = updates.filter((u) => u.session_id === s.id).length;
+        return {
+          ...s,
+          video_link: link,
+          current_location: loc,
+          location_count: count,
+        };
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
+
+  async getLocationHistory(sessionId: string): Promise<LocationUpdate[]> {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('location_updates')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+      if (!error && data) {
+        return data as LocationUpdate[];
+      }
+    }
+
+    const updates = getLocalData<LocationUpdate[]>(LOCAL_UPDATES_KEY, []);
+    return updates
+      .filter((u) => u.session_id === sessionId)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  },
+
+  /**
+   * Realtime Subscriptions
+   */
+  subscribeToSession(sessionId: string, onUpdate: (session: VisitorSession) => void): () => void {
+    const supabase = getSupabaseClient();
+
+    if (supabase) {
+      const channel = supabase
+        .channel(`session_${sessionId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'visitor_sessions',
+            filter: `id=eq.${sessionId}`,
+          },
+          (payload) => {
+            if (payload.new) {
+              onUpdate(payload.new as VisitorSession);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+
+    // Local broadcast channel fallback
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'DATA_UPDATED' && event.data?.key === LOCAL_SESSIONS_KEY) {
+        const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+        const target = sessions.find((s) => s.id === sessionId);
+        if (target) {
+          onUpdate(target);
+        }
+      }
+    };
+
+    if (localChannel) {
+      localChannel.addEventListener('message', handler);
+    }
+
+    // Also window storage listener for cross-window
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === LOCAL_SESSIONS_KEY) {
+        const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
+        const target = sessions.find((s) => s.id === sessionId);
+        if (target) {
+          onUpdate(target);
+        }
+      }
+    };
+    window.addEventListener('storage', storageHandler);
+
+    return () => {
+      if (localChannel) {
+        localChannel.removeEventListener('message', handler);
+      }
+      window.removeEventListener('storage', storageHandler);
+    };
+  },
+
+  subscribeToAllSessions(onUpdate: () => void): () => void {
+    const supabase = getSupabaseClient();
+
+    if (supabase) {
+      const channel = supabase
+        .channel('admin_sessions_channel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'visitor_sessions' }, () => {
+          onUpdate();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'current_locations' }, () => {
+          onUpdate();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'location_updates' }, () => {
+          onUpdate();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+
+    // Local broadcast channel fallback
+    const handler = () => {
+      onUpdate();
+    };
+
+    if (localChannel) {
+      localChannel.addEventListener('message', handler);
+    }
+    window.addEventListener('storage', handler);
+
+    return () => {
+      if (localChannel) {
+        localChannel.removeEventListener('message', handler);
+      }
+      window.removeEventListener('storage', handler);
+    };
+  },
+};

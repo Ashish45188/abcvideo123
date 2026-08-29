@@ -1,0 +1,6 @@
+{
+  "name": "GeoVideo Tracker",
+  "description": "Consent-based location sharing application with Photo, Direct Video, and YouTube media unlock and real-time live map tracking",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

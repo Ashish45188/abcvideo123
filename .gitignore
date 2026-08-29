@@ -1,0 +1,27 @@
+# Dependencies - DON'T upload
+node_modules/
+
+# Environment / secrets - DON'T upload
+.env
+.env.local
+.env.*.local
+
+# Vite build output - DON'T upload
+dist/
+
+# Vercel local files - DON'T upload
+.vercel/
+
+# Logs - DON'T upload
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS files - DON'T upload
+.DS_Store
+Thumbs.db
+
+# IDE files - DON'T upload
+.vscode/
+.idea/

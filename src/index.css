@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0a0a0b;
+  --bg-surface: #121215;
+  --bg-surface-elevated: #18181c;
+  --border-subtle: #222226;
+  --border-strong: #323238;
+  --accent-lime: #d1ff26;
+  --text-main: #f0f0f2;
+  --text-muted: #8e8e96;
+}
+
+body {
+  background-color: #0a0a0b;
+  color: #f0f0f2;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Leaflet Editorial Theme Customizations */
+.leaflet-popup-content-wrapper {
+  background: #0d0d0f !important;
+  color: #f0f0f2 !important;
+  border-radius: 12px !important;
+  border: 1px solid #28282e !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: #0d0d0f !important;
+  border: 1px solid #28282e !important;
+}
+
+.leaflet-container {
+  font-family: inherit !important;
+  background-color: #08080a !important;
+}
+
+/* Custom Marker Styling */
+.custom-live-marker {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Smooth enter animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ADMIN PORTAL बटन आणि Location Card लपवण्यासाठी */
+.admin-portal-btn,
+.location-sharing-card {
+  display: none !important;
+}
