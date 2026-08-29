@@ -52,10 +52,10 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // Default center (e.g. World center or default coords)
+    // Default center: Maharashtra (so any visitor within the state is visible by default)
     const map = L.map(mapContainerRef.current, {
-      center: [20.5937, 78.9629],
-      zoom: 4,
+      center: [19.7515, 75.7139],
+      zoom: 7,
       zoomControl: false,
     });
 
@@ -246,9 +246,13 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
     if (selectedSessionId && currentMarkers.has(selectedSessionId)) {
       const target = currentMarkers.get(selectedSessionId)!;
       map.panTo(target.marker.getLatLng(), { animate: true, duration: 0.5 });
-    } else if (validPositions.length > 0 && !map.getBounds().contains(validPositions[0])) {
-      const bounds = L.latLngBounds(validPositions);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+    } else if (validPositions.length > 0) {
+      const currentBounds = map.getBounds();
+      const allWithinView = validPositions.every((pos) => currentBounds.contains(pos));
+      if (!allWithinView) {
+        const bounds = L.latLngBounds(validPositions);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      }
     }
   }, [sessions, selectedSessionId, onSelectSession, developerLocation]);
 
