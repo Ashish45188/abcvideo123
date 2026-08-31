@@ -9,7 +9,12 @@ export default async function handler(req, res) {
     let title = 'Shared Document';
     let description = 'Tap to view the shared document.';
     let imageUrl = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
-    const siteUrl = `https://${req.headers.host || 'geovideo-tracker.vercel.app'}${req.url}`;
+
+    const host = req.headers['x-forwarded-host'] || req.headers.host || 'geovideo-tracker.vercel.app';
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const siteUrl = shareId
+      ? `${proto}://${host}/?watch=${encodeURIComponent(shareId)}`
+      : `${proto}://${host}${req.url}`;
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
     const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
@@ -51,6 +56,13 @@ export default async function handler(req, res) {
       }
     }
 
+    // Ensure absolute image URL with https
+    if (imageUrl.startsWith('/')) {
+      imageUrl = `${proto}://${host}${imageUrl}`;
+    } else if (imageUrl.startsWith('http://')) {
+      imageUrl = imageUrl.replace('http://', 'https://');
+    }
+
     // Load dist/index.html if built, otherwise index.html from root
     let htmlPath = path.join(process.cwd(), 'dist', 'index.html');
     if (!fs.existsSync(htmlPath)) {
@@ -74,36 +86,46 @@ export default async function handler(req, res) {
 </html>`;
     }
 
-    // Helper escape for HTML attribute values
-    const escapeHtml = (str) =>
+    const escapeAttr = (str) =>
       String(str)
-        .replace(/&/g, '&amp;')
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-    const safeTitle = escapeHtml(title);
-    const safeDesc = escapeHtml(description);
-    const safeImage = escapeHtml(imageUrl);
-    const safeUrl = escapeHtml(siteUrl);
+    const safeTitle = escapeAttr(title);
+    const safeDesc = escapeAttr(description);
+    const safeImage = escapeAttr(imageUrl);
+    const safeUrl = escapeAttr(siteUrl);
 
     // Replace title
     html = html.replace(/<title>.*?<\/title>/i, `<title>${safeTitle}</title>`);
 
-    // Helper function to replace or inject meta tags safely
-    const setOrReplaceMeta = (htmlContent, attrName, attrVal, contentVal) => {
-      const regex = new RegExp(`<meta\\s+${attrName}=["']${attrVal}["']\\s+content=["'].*?["']\\s*\\/?>`, 'gi');
-      if (regex.test(htmlContent)) {
-        return htmlContent.replace(regex, `<meta ${attrName}="${attrVal}" content="${contentVal}" />`);
+    // Helper function to replace or inject meta tags safely without RegExp state bugs
+    const setOrReplaceMeta = (htmlContent, attrKey, attrVal, contentVal) => {
+      // Non-global regex matching <meta ... attrKey="attrVal" ... >
+      const pattern = new RegExp(
+        `<meta\\s+[^>]*?${attrKey}=["']${attrVal}["'][^>]*?>`,
+        'i'
+      );
+      const newMeta = `<meta ${attrKey}="${attrVal}" content="${contentVal}" />`;
+
+      if (pattern.test(htmlContent)) {
+        return htmlContent.replace(pattern, newMeta);
       } else {
-        return htmlContent.replace('</head>', `  <meta ${attrName}="${attrVal}" content="${contentVal}" />\n</head>`);
+        return htmlContent.replace('</head>', `  ${newMeta}\n</head>`);
       }
     };
 
+    html = setOrReplaceMeta(html, 'name', 'description', safeDesc);
+
     html = setOrReplaceMeta(html, 'property', 'og:type', 'website');
+    html = setOrReplaceMeta(html, 'property', 'og:site_name', 'GeoVideo Tracker');
     html = setOrReplaceMeta(html, 'property', 'og:title', safeTitle);
     html = setOrReplaceMeta(html, 'property', 'og:description', safeDesc);
     html = setOrReplaceMeta(html, 'property', 'og:image', safeImage);
+    html = setOrReplaceMeta(html, 'property', 'og:image:secure_url', safeImage);
+    html = setOrReplaceMeta(html, 'property', 'og:image:width', '1200');
+    html = setOrReplaceMeta(html, 'property', 'og:image:height', '630');
     html = setOrReplaceMeta(html, 'property', 'og:url', safeUrl);
 
     html = setOrReplaceMeta(html, 'name', 'twitter:card', 'summary_large_image');
