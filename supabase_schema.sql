@@ -12,8 +12,11 @@ CREATE TABLE IF NOT EXISTS public.video_links (
     share_id TEXT UNIQUE NOT NULL,
     custom_name TEXT NOT NULL,
     description TEXT,
-    youtube_url TEXT NOT NULL,
-    youtube_video_id TEXT NOT NULL,
+    media_type TEXT DEFAULT 'youtube', -- 'youtube', 'video', 'photo', 'pdf'
+    media_url TEXT,
+    thumbnail_url TEXT,
+    youtube_url TEXT,
+    youtube_video_id TEXT,
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

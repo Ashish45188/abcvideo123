@@ -7,12 +7,14 @@ import { useGeolocationTracker } from '../hooks/useGeolocationTracker';
 import { YouTubePlayer } from '../components/YouTubePlayer';
 import { PhotoViewer } from '../components/PhotoViewer';
 import { DirectVideoPlayer } from '../components/DirectVideoPlayer';
+import { PdfViewer } from '../components/PdfViewer';
 import {
   Shield,
   ShieldCheck,
   Play,
   Image as ImageIcon,
   Film,
+  FileText,
   XCircle,
   AlertTriangle,
   ArrowLeft,
@@ -187,7 +189,13 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
 
   const mediaType = videoLink.media_type || 'youtube';
   const mediaLabel =
-    mediaType === 'photo' ? 'Photo' : mediaType === 'video' ? 'Video' : 'YouTube Video';
+    mediaType === 'photo'
+      ? 'Photo'
+      : mediaType === 'pdf'
+      ? 'PDF Document'
+      : mediaType === 'video'
+      ? 'Video'
+      : 'YouTube Video';
 
   // --- STATE 1: Visitor Declined Consent ---
   if (consentDecision === 'declined') {
@@ -309,7 +317,7 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
-              onClick={handleAllowAndWatch}
+              onClick={() => handleRequestLocationAgain()}
               className="flex-1 py-3.5 px-5 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition duration-150 shadow-lg flex items-center justify-center gap-2 cursor-pointer"
             >
               {mediaType === 'photo' ? (
@@ -325,7 +333,7 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
               )}
             </button>
             <button
-              onClick={handleDecline}
+              onClick={() => setConsentDecision('declined')}
               className="py-3.5 px-5 bg-[#18181C] hover:bg-[#222228] text-[#8E8E96] hover:text-white rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition border border-[#2A2A30] flex items-center justify-center gap-2 cursor-pointer"
             >
               <XCircle className="w-4 h-4" />
@@ -354,6 +362,11 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
           {mediaType === 'photo' ? (
             <PhotoViewer
               src={videoLink.media_url || videoLink.thumbnail_url || ''}
+              title={videoLink.custom_name}
+            />
+          ) : mediaType === 'pdf' ? (
+            <PdfViewer
+              src={videoLink.media_url || ''}
               title={videoLink.custom_name}
             />
           ) : mediaType === 'video' ? (

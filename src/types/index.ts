@@ -7,15 +7,15 @@ export type SessionStatus =
   | 'location_unavailable'
   | 'expired';
 
-export type MediaType = 'youtube' | 'video' | 'photo';
+export type MediaType = 'youtube' | 'video' | 'photo' | 'pdf';
 
 export interface VideoLink {
   id: string;
   share_id: string;
   custom_name: string;
   description?: string | null;
-  media_type?: MediaType; // 'youtube' | 'video' | 'photo' (defaults to 'youtube')
-  media_url?: string | null; // Direct image URL or direct video URL / Base64 data URL
+  media_type?: MediaType; // 'youtube' | 'video' | 'photo' | 'pdf' (defaults to 'youtube')
+  media_url?: string | null; // Direct image/PDF URL or direct video URL / Base64 data URL
   thumbnail_url?: string | null; // Custom or extracted thumbnail
   youtube_url?: string;
   youtube_video_id?: string;
