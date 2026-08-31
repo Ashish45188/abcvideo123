@@ -16,6 +16,7 @@ import {
   UploadCloud,
   FileVideo,
   FileImage,
+  FileText,
   RefreshCw,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -85,6 +86,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
   const [mediaType, setMediaType] = useState<MediaType>('photo');
   const [photoInputMode, setPhotoInputMode] = useState<'upload' | 'url'>('upload');
   const [videoInputMode, setVideoInputMode] = useState<'upload' | 'url'>('upload');
+  const [pdfInputMode, setPdfInputMode] = useState<'upload' | 'url'>('upload');
 
   // Input states
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -123,10 +125,10 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Size limit check: 25MB for video, 12MB for photo
-    const maxBytes = mediaType === 'photo' ? 12 * 1024 * 1024 : 35 * 1024 * 1024;
+    // Size limit check: 25MB for video, 12MB for photo/PDF
+    const maxBytes = (mediaType === 'photo' || mediaType === 'pdf') ? 15 * 1024 * 1024 : 35 * 1024 * 1024;
     if (file.size > maxBytes) {
-      setError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max allowed size is ${mediaType === 'photo' ? '12MB' : '35MB'}.`);
+      setError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max allowed size is ${mediaType === 'video' ? '35MB' : '15MB'}.`);
       return;
     }
 
@@ -183,6 +185,11 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
         setError('Please select an image file or provide a valid photo URL.');
         return;
       }
+    } else if (mediaType === 'pdf') {
+      if (!directMediaUrl.trim()) {
+        setError('Please select a PDF file or provide a valid PDF URL.');
+        return;
+      }
     } else if (mediaType === 'video') {
       if (!directMediaUrl.trim()) {
         setError('Please select a video file or provide a valid video stream URL.');
@@ -196,7 +203,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
         media_type: mediaType,
         youtube_url: mediaType === 'youtube' ? youtubeUrl : undefined,
         media_url: mediaType !== 'youtube' ? directMediaUrl : undefined,
-        thumbnail_url: mediaType === 'photo' ? directMediaUrl : undefined,
+        thumbnail_url: mediaType === 'photo' ? directMediaUrl : mediaType === 'pdf' ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80' : undefined,
         custom_name: customName,
         description: description,
       });
@@ -253,6 +260,8 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
               <h3 className="text-xl font-bold uppercase tracking-wider text-white font-mono">
                 {createdLink.media_type === 'photo'
                   ? 'PHOTO TRACKING LINK READY'
+                  : createdLink.media_type === 'pdf'
+                  ? 'PDF DOCUMENT TRACKING LINK READY'
                   : createdLink.media_type === 'video'
                   ? 'DIRECT VIDEO TRACKING LINK READY'
                   : 'YOUTUBE TRACKING LINK READY'}
@@ -267,6 +276,8 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
               <div className="w-10 h-10 rounded-xl bg-[#141810] border border-[#304018] flex items-center justify-center text-[#D1FF26] shrink-0">
                 {createdLink.media_type === 'photo' ? (
                   <ImageIcon className="w-5 h-5" />
+                ) : createdLink.media_type === 'pdf' ? (
+                  <FileText className="w-5 h-5" />
                 ) : createdLink.media_type === 'video' ? (
                   <Film className="w-5 h-5" />
                 ) : (
@@ -277,6 +288,8 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                 <span className="text-[10px] font-bold text-[#D1FF26] uppercase tracking-widest block">
                   {createdLink.media_type === 'photo'
                     ? 'PROTECTED PHOTO'
+                    : createdLink.media_type === 'pdf'
+                    ? 'PROTECTED PDF DOCUMENT'
                     : createdLink.media_type === 'video'
                     ? 'PROTECTED DIRECT VIDEO'
                     : 'PROTECTED YOUTUBE'}
@@ -359,21 +372,37 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
               <label className="text-xs font-mono font-bold text-[#D0D0D5] uppercase tracking-wider">
                 Select Media Type
               </label>
-              <div className="grid grid-cols-3 gap-2 bg-[#0A0A0B] p-1 rounded-2xl border border-[#2A2A30]">
+              <div className="grid grid-cols-4 gap-1.5 bg-[#0A0A0B] p-1 rounded-2xl border border-[#2A2A30]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaType('pdf');
+                    setError(null);
+                  }}
+                  className={`py-2 px-2 rounded-xl font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition cursor-pointer ${
+                    mediaType === 'pdf'
+                      ? 'bg-[#18181C] text-[#D1FF26] border border-[#304018] shadow-md'
+                      : 'text-[#8E8E96] hover:text-white'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>PDF</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     setMediaType('photo');
                     setError(null);
                   }}
-                  className={`py-2.5 px-3 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  className={`py-2 px-2 rounded-xl font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition cursor-pointer ${
                     mediaType === 'photo'
                       ? 'bg-[#18181C] text-[#D1FF26] border border-[#304018] shadow-md'
                       : 'text-[#8E8E96] hover:text-white'
                   }`}
                 >
-                  <ImageIcon className="w-4 h-4" />
-                  <span>Photo / Image</span>
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Photo</span>
                 </button>
 
                 <button
@@ -382,14 +411,14 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                     setMediaType('video');
                     setError(null);
                   }}
-                  className={`py-2.5 px-3 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  className={`py-2 px-2 rounded-xl font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition cursor-pointer ${
                     mediaType === 'video'
                       ? 'bg-[#18181C] text-[#D1FF26] border border-[#304018] shadow-md'
                       : 'text-[#8E8E96] hover:text-white'
                   }`}
                 >
-                  <Film className="w-4 h-4" />
-                  <span>Direct Video</span>
+                  <Film className="w-3.5 h-3.5" />
+                  <span>Video</span>
                 </button>
 
                 <button
@@ -398,17 +427,114 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                     setMediaType('youtube');
                     setError(null);
                   }}
-                  className={`py-2.5 px-3 rounded-xl font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                  className={`py-2 px-2 rounded-xl font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition cursor-pointer ${
                     mediaType === 'youtube'
                       ? 'bg-[#18181C] text-[#D1FF26] border border-[#304018] shadow-md'
                       : 'text-[#8E8E96] hover:text-white'
                   }`}
                 >
-                  <Play className="w-4 h-4 fill-current" />
+                  <Play className="w-3.5 h-3.5 fill-current" />
                   <span>YouTube</span>
                 </button>
               </div>
             </div>
+
+            {/* TAB: PDF Document Config */}
+            {mediaType === 'pdf' && (
+              <div className="space-y-4 bg-[#0E0E10] p-4 rounded-2xl border border-[#222226]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-[#D1FF26]" />
+                    PDF Document Source
+                  </span>
+                  <div className="flex bg-[#0A0A0B] p-0.5 rounded-lg border border-[#2A2A30] text-[11px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setPdfInputMode('upload')}
+                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                        pdfInputMode === 'upload' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
+                      }`}
+                    >
+                      Upload File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPdfInputMode('url')}
+                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                        pdfInputMode === 'url' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
+                      }`}
+                    >
+                      PDF URL
+                    </button>
+                  </div>
+                </div>
+
+                {pdfInputMode === 'upload' ? (
+                  <div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="application/pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
+                        <UploadCloud className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                          Click to Browse or Drop PDF Document
+                        </p>
+                        <p className="text-[11px] text-[#8E8E96] font-mono">
+                          PDF files (Up to 15MB)
+                        </p>
+                      </div>
+                      {uploadedFileName && (
+                        <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span className="truncate max-w-xs">{uploadedFileName}</span>
+                          <span className="text-[#8E8E96]">({uploadedFileSize})</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <input
+                      type="url"
+                      placeholder="https://example.com/document.pdf"
+                      value={directMediaUrl}
+                      onChange={(e) => {
+                        setDirectMediaUrl(e.target.value);
+                        setPreviewMediaUrl(e.target.value);
+                      }}
+                      className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* Live Preview */}
+                {previewMediaUrl && (
+                  <div className="flex items-center gap-3 bg-[#0A0A0B] p-2.5 rounded-xl border border-[#2A2A30]">
+                    <div className="w-12 h-12 rounded-lg bg-[#18181C] border border-[#2A2A30] flex items-center justify-center text-[#D1FF26] shrink-0 font-mono text-xs font-bold">
+                      PDF
+                    </div>
+                    <div className="text-xs space-y-0.5 truncate font-mono">
+                      <span className="font-bold text-[#D1FF26] flex items-center gap-1 uppercase tracking-wider text-[11px]">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> PDF Loaded &amp; Ready
+                      </span>
+                      <p className="text-[#8E8E96] text-[11px] font-mono truncate max-w-xs">
+                        {uploadedFileName || previewMediaUrl}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* TAB 1: Photo / Image Config */}
             {mediaType === 'photo' && (
@@ -746,7 +872,9 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                   {isSubmitting
                     ? 'Generating Tracking Link...'
                     : `Generate ${
-                        mediaType === 'photo'
+                        mediaType === 'pdf'
+                          ? 'PDF'
+                          : mediaType === 'photo'
                           ? 'Photo'
                           : mediaType === 'video'
                           ? 'Direct Video'

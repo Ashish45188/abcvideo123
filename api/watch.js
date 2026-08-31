@@ -46,6 +46,8 @@ export default async function handler(req, res) {
               imageUrl = link.media_url;
             } else if (link.thumbnail_url) {
               imageUrl = link.thumbnail_url;
+            } else if (link.media_type === 'pdf') {
+              imageUrl = link.thumbnail_url || 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80';
             } else if (link.youtube_video_id) {
               imageUrl = `https://img.youtube.com/vi/${link.youtube_video_id}/hqdefault.jpg`;
             } else if (link.media_url && link.media_url.match(/\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i)) {

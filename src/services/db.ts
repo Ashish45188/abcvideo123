@@ -172,6 +172,23 @@ export const db = {
         active: true,
         created_at: new Date().toISOString(),
       };
+    } else if (mediaType === 'pdf') {
+      const pdfUrl = input.media_url || '';
+      if (!pdfUrl.trim()) {
+        throw new Error('Please select a PDF file or provide a valid PDF URL.');
+      }
+      const defaultPdfThumbnail = 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80';
+      newLink = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `link_${Date.now()}`,
+        share_id: shareId,
+        custom_name: input.custom_name.trim(),
+        description: input.description?.trim() || null,
+        media_type: 'pdf',
+        media_url: pdfUrl.trim(),
+        thumbnail_url: input.thumbnail_url?.trim() || defaultPdfThumbnail,
+        active: true,
+        created_at: new Date().toISOString(),
+      };
     } else {
       // mediaType === 'video'
       const videoUrl = input.media_url || '';
