@@ -4,7 +4,9 @@ import path from 'path';
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const shareId = url.searchParams.get('watch') || url.searchParams.get('share_id') || '';
+    const queryWatch = req.query && (req.query.watch || req.query.share_id);
+    const urlWatch = url.searchParams.get('watch') || url.searchParams.get('share_id');
+    const shareId = queryWatch || urlWatch || '';
 
     let title = 'Shared Document';
     let description = 'Tap to view the shared document.';
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
 
     if (shareId && supabaseUrl && supabaseAnonKey) {
       try {
-        const fetchUrl = `${supabaseUrl}/rest/v1/video_links?share_id=eq.${encodeURIComponent(shareId)}&active=eq.true&select=*`;
+        const fetchUrl = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/video_links?share_id=eq.${encodeURIComponent(shareId)}&active=eq.true&select=*`;
         const response = await fetch(fetchUrl, {
           headers: {
             apikey: supabaseAnonKey,
@@ -74,7 +76,7 @@ export default async function handler(req, res) {
       html = fs.readFileSync(htmlPath, 'utf8');
     } else {
       html = `<!doctype html>
-<html lang="en">
+<html lang="en" prefix="og: http://ogp.me/ns#">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -88,6 +90,7 @@ export default async function handler(req, res) {
 
     const escapeAttr = (str) =>
       String(str)
+        .replace(/&/g, '&amp;')
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
@@ -97,12 +100,11 @@ export default async function handler(req, res) {
     const safeImage = escapeAttr(imageUrl);
     const safeUrl = escapeAttr(siteUrl);
 
-    // Replace title
+    // Replace <title>
     html = html.replace(/<title>.*?<\/title>/i, `<title>${safeTitle}</title>`);
 
-    // Helper function to replace or inject meta tags safely without RegExp state bugs
+    // Helper function to replace or inject meta tags cleanly
     const setOrReplaceMeta = (htmlContent, attrKey, attrVal, contentVal) => {
-      // Non-global regex matching <meta ... attrKey="attrVal" ... >
       const pattern = new RegExp(
         `<meta\\s+[^>]*?${attrKey}=["']${attrVal}["'][^>]*?>`,
         'i'
@@ -124,6 +126,7 @@ export default async function handler(req, res) {
     html = setOrReplaceMeta(html, 'property', 'og:description', safeDesc);
     html = setOrReplaceMeta(html, 'property', 'og:image', safeImage);
     html = setOrReplaceMeta(html, 'property', 'og:image:secure_url', safeImage);
+    html = setOrReplaceMeta(html, 'property', 'og:image:type', 'image/jpeg');
     html = setOrReplaceMeta(html, 'property', 'og:image:width', '1200');
     html = setOrReplaceMeta(html, 'property', 'og:image:height', '630');
     html = setOrReplaceMeta(html, 'property', 'og:url', safeUrl);
