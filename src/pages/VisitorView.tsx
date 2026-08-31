@@ -35,6 +35,45 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
 
   const visitorId = getOrCreateVisitorId();
 
+  // Update document title and Open Graph / Twitter meta tags on link change
+  useEffect(() => {
+    if (!videoLink) return;
+
+    const title = videoLink.custom_name || 'Shared Document';
+    const description = videoLink.description || 'Tap to view the shared document.';
+    let imageUrl = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
+
+    if (videoLink.media_type === 'photo' && videoLink.media_url) {
+      imageUrl = videoLink.media_url;
+    } else if (videoLink.thumbnail_url) {
+      imageUrl = videoLink.thumbnail_url;
+    } else if (videoLink.youtube_video_id) {
+      imageUrl = `https://img.youtube.com/vi/${videoLink.youtube_video_id}/maxresdefault.jpg`;
+    } else if (videoLink.media_url && videoLink.media_url.match(/\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i)) {
+      imageUrl = videoLink.media_url;
+    }
+
+    document.title = title;
+
+    const setMetaTag = (selector: string, attrName: string, attrVal: string, content: string) => {
+      let element = document.querySelector(selector);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attrName, attrVal);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', content);
+    };
+
+    setMetaTag('meta[property="og:title"]', 'property', 'og:title', title);
+    setMetaTag('meta[property="og:description"]', 'property', 'og:description', description);
+    setMetaTag('meta[property="og:image"]', 'property', 'og:image', imageUrl);
+    setMetaTag('meta[property="og:url"]', 'property', 'og:url', window.location.href);
+    setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', title);
+    setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', description);
+    setMetaTag('meta[name="twitter:image"]', 'name', 'twitter:image', imageUrl);
+  }, [videoLink]);
+
   // Load Video Link metadata
   useEffect(() => {
     let isMounted = true;
