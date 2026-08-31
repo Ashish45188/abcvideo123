@@ -40,7 +40,7 @@ export default async function handler(req, res) {
             } else if (link.thumbnail_url) {
               imageUrl = link.thumbnail_url;
             } else if (link.youtube_video_id) {
-              imageUrl = `https://img.youtube.com/vi/${link.youtube_video_id}/maxresdefault.jpg`;
+              imageUrl = `https://img.youtube.com/vi/${link.youtube_video_id}/hqdefault.jpg`;
             } else if (link.media_url && link.media_url.match(/\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i)) {
               imageUrl = link.media_url;
             }
@@ -87,33 +87,29 @@ export default async function handler(req, res) {
     const safeImage = escapeHtml(imageUrl);
     const safeUrl = escapeHtml(siteUrl);
 
-    // Replace or inject Open Graph and Twitter tags
+    // Replace title
     html = html.replace(/<title>.*?<\/title>/i, `<title>${safeTitle}</title>`);
 
-    if (html.includes('og:title')) {
-      html = html
-        .replace(/<meta property="og:title" content=".*?" \/>/i, `<meta property="og:title" content="${safeTitle}" />`)
-        .replace(/<meta property="og:description" content=".*?" \/>/i, `<meta property="og:description" content="${safeDesc}" />`)
-        .replace(/<meta property="og:image" content=".*?" \/>/i, `<meta property="og:image" content="${safeImage}" />`)
-        .replace(/<meta property="og:url" content=".*?" \/>/i, `<meta property="og:url" content="${safeUrl}" />`)
-        .replace(/<meta name="twitter:title" content=".*?" \/>/i, `<meta name="twitter:title" content="${safeTitle}" />`)
-        .replace(/<meta name="twitter:description" content=".*?" \/>/i, `<meta name="twitter:description" content="${safeDesc}" />`)
-        .replace(/<meta name="twitter:image" content=".*?" \/>/i, `<meta name="twitter:image" content="${safeImage}" />`);
-    } else {
-      const metaTags = `
-    <!-- Open Graph / Rich Preview -->
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="${safeTitle}" />
-    <meta property="og:description" content="${safeDesc}" />
-    <meta property="og:image" content="${safeImage}" />
-    <meta property="og:url" content="${safeUrl}" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${safeTitle}" />
-    <meta name="twitter:description" content="${safeDesc}" />
-    <meta name="twitter:image" content="${safeImage}" />
-`;
-      html = html.replace('</head>', `${metaTags}\n</head>`);
-    }
+    // Helper function to replace or inject meta tags safely
+    const setOrReplaceMeta = (htmlContent, attrName, attrVal, contentVal) => {
+      const regex = new RegExp(`<meta\\s+${attrName}=["']${attrVal}["']\\s+content=["'].*?["']\\s*\\/?>`, 'gi');
+      if (regex.test(htmlContent)) {
+        return htmlContent.replace(regex, `<meta ${attrName}="${attrVal}" content="${contentVal}" />`);
+      } else {
+        return htmlContent.replace('</head>', `  <meta ${attrName}="${attrVal}" content="${contentVal}" />\n</head>`);
+      }
+    };
+
+    html = setOrReplaceMeta(html, 'property', 'og:type', 'website');
+    html = setOrReplaceMeta(html, 'property', 'og:title', safeTitle);
+    html = setOrReplaceMeta(html, 'property', 'og:description', safeDesc);
+    html = setOrReplaceMeta(html, 'property', 'og:image', safeImage);
+    html = setOrReplaceMeta(html, 'property', 'og:url', safeUrl);
+
+    html = setOrReplaceMeta(html, 'name', 'twitter:card', 'summary_large_image');
+    html = setOrReplaceMeta(html, 'name', 'twitter:title', safeTitle);
+    html = setOrReplaceMeta(html, 'name', 'twitter:description', safeDesc);
+    html = setOrReplaceMeta(html, 'name', 'twitter:image', safeImage);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
