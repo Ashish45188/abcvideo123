@@ -190,17 +190,22 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
       }
 
       // If a local file was selected or directMediaUrl is base64 data URL
+      let publicImageUrl: string | null = null;
       if (selectedFile) {
         setIsSubmitting(true);
-        const uploadedStorageUrl = await uploadMediaToSupabaseStorage(selectedFile);
-        if (uploadedStorageUrl) {
-          finalMediaUrl = uploadedStorageUrl;
+        publicImageUrl = await uploadMediaToSupabaseStorage(selectedFile);
+        if (publicImageUrl) {
+          finalMediaUrl = publicImageUrl;
         } else {
           setError('WhatsApp preview requires a public HTTPS URL. Please connect Supabase Storage.');
           setIsSubmitting(false);
           return;
         }
+      } else {
+        publicImageUrl = finalMediaUrl;
       }
+
+      console.log('SUPABASE PUBLIC URL:', publicImageUrl);
 
       if (finalMediaUrl.startsWith('data:') || finalMediaUrl.startsWith('blob:')) {
         setError('WhatsApp preview requires a public HTTPS URL. Base64 or Blob URLs cannot be previewed by WhatsApp. Please connect Supabase Storage.');
@@ -214,8 +219,8 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
       const thumbnailUrl = mediaType === 'photo' ? finalMediaUrl : mediaType === 'pdf' ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80' : undefined;
       const previewImageUrl = thumbnailUrl || finalMediaUrl;
 
-      console.log('Database thumbnail_url:', thumbnailUrl);
-      console.log('WhatsApp preview image URL:', previewImageUrl);
+      console.log('ITEM THUMBNAIL URL:', thumbnailUrl);
+      console.log('WHATSAPP PREVIEW IMAGE URL:', previewImageUrl);
 
       const result = await onSubmit({
         media_type: mediaType,

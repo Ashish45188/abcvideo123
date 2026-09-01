@@ -95,7 +95,7 @@ export async function uploadMediaToSupabaseStorage(file: File): Promise<string |
     const { data: publicUrlData } = supabase.storage.from(targetBucket).getPublicUrl(filePath);
     const publicImageUrl = publicUrlData?.publicUrl || null;
 
-    console.log('Generated public image URL:', publicImageUrl);
+    console.log('SUPABASE PUBLIC URL:', publicImageUrl);
 
     if (
       publicImageUrl &&
