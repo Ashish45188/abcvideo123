@@ -152,3 +152,43 @@ CREATE INDEX IF NOT EXISTS idx_visitor_sessions_video_link ON public.visitor_ses
 CREATE INDEX IF NOT EXISTS idx_visitor_sessions_status ON public.visitor_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_location_updates_session ON public.location_updates(session_id);
 CREATE INDEX IF NOT EXISTS idx_location_updates_created_at ON public.location_updates(created_at);
+
+-- ================================================================
+-- 9. Supabase Storage Bucket & RLS Policies
+-- ================================================================
+
+-- Create public storage bucket 'whatsapp-thumbnails' if not exists
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('whatsapp-thumbnails', 'whatsapp-thumbnails', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Storage Object RLS Policies for whatsapp-thumbnails:
+
+-- Allow public read access to all objects in whatsapp-thumbnails bucket
+CREATE POLICY "Public Read Access for whatsapp-thumbnails"
+    ON storage.objects
+    FOR SELECT
+    TO public
+    USING (bucket_id = 'whatsapp-thumbnails');
+
+-- Allow authenticated and anon users to upload files to whatsapp-thumbnails bucket
+CREATE POLICY "Allow Upload to whatsapp-thumbnails"
+    ON storage.objects
+    FOR INSERT
+    TO anon, authenticated
+    WITH CHECK (bucket_id = 'whatsapp-thumbnails');
+
+-- Allow update access to objects in whatsapp-thumbnails bucket
+CREATE POLICY "Allow Update in whatsapp-thumbnails"
+    ON storage.objects
+    FOR UPDATE
+    TO anon, authenticated
+    USING (bucket_id = 'whatsapp-thumbnails')
+    WITH CHECK (bucket_id = 'whatsapp-thumbnails');
+
+-- Allow delete access to objects in whatsapp-thumbnails bucket
+CREATE POLICY "Allow Delete in whatsapp-thumbnails"
+    ON storage.objects
+    FOR DELETE
+    TO anon, authenticated
+    USING (bucket_id = 'whatsapp-thumbnails');
