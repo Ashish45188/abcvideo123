@@ -177,11 +177,17 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
     }
 
     let finalMediaUrl = directMediaUrl;
+    let publicImageUrl: string | null = null;
+    let storagePath: string | null = null;
 
     if (mediaType === 'youtube') {
       if (!isValidYouTubeUrl(youtubeUrl)) {
         setError('Please provide a valid YouTube URL (watch, share, shorts, or embed).');
         return;
+      }
+      const ytid = extractYouTubeVideoId(youtubeUrl);
+      if (ytid) {
+        publicImageUrl = getYouTubeThumbnailUrl(ytid);
       }
     } else {
       if (!directMediaUrl.trim()) {
@@ -190,13 +196,15 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
       }
 
       // If a local file was selected or directMediaUrl is base64 data URL
-      let publicImageUrl: string | null = null;
       if (selectedFile) {
         setIsSubmitting(true);
-        publicImageUrl = await uploadMediaToSupabaseStorage(selectedFile);
-        if (publicImageUrl) {
+        const uploadRes = await uploadMediaToSupabaseStorage(selectedFile);
+        if (uploadRes && uploadRes.publicImageUrl) {
+          publicImageUrl = uploadRes.publicImageUrl;
+          storagePath = uploadRes.storagePath;
           finalMediaUrl = publicImageUrl;
         } else {
+          storagePath = uploadRes?.storagePath || null;
           setError('WhatsApp preview requires a public HTTPS URL. Please connect Supabase Storage.');
           setIsSubmitting(false);
           return;
@@ -204,8 +212,6 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
       } else {
         publicImageUrl = finalMediaUrl;
       }
-
-      console.log('SUPABASE PUBLIC URL:', publicImageUrl);
 
       if (finalMediaUrl.startsWith('data:') || finalMediaUrl.startsWith('blob:')) {
         setError('WhatsApp preview requires a public HTTPS URL. Base64 or Blob URLs cannot be previewed by WhatsApp. Please connect Supabase Storage.');
@@ -217,10 +223,15 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
     setIsSubmitting(true);
     try {
       const thumbnailUrl = mediaType === 'photo' ? finalMediaUrl : mediaType === 'pdf' ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80' : undefined;
-      const previewImageUrl = thumbnailUrl || finalMediaUrl;
+      const previewImageUrl = thumbnailUrl || (mediaType === 'youtube' && videoId ? getYouTubeThumbnailUrl(videoId) : finalMediaUrl);
 
-      console.log('ITEM THUMBNAIL URL:', thumbnailUrl);
-      console.log('WHATSAPP PREVIEW IMAGE URL:', previewImageUrl);
+      console.log("=== WHATSAPP DEBUG ===");
+      console.log("selected file:", selectedFile);
+      console.log("storage path:", storagePath);
+      console.log("public image URL:", publicImageUrl);
+      console.log("database thumbnail_url:", thumbnailUrl);
+      console.log("preview image URL:", previewImageUrl);
+      console.log("======================");
 
       const result = await onSubmit({
         media_type: mediaType,

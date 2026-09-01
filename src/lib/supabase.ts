@@ -63,7 +63,9 @@ export function getSupabaseClient(): SupabaseClient | null {
   return supabaseInstance;
 }
 
-export async function uploadMediaToSupabaseStorage(file: File): Promise<string | null> {
+export async function uploadMediaToSupabaseStorage(
+  file: File
+): Promise<{ publicImageUrl: string | null; storagePath: string | null } | null> {
   console.log('Selected file:', file);
 
   const supabase = getSupabaseClient();
@@ -89,7 +91,7 @@ export async function uploadMediaToSupabaseStorage(file: File): Promise<string |
 
     if (uploadResult.error) {
       console.warn(`Supabase Storage upload error for bucket '${targetBucket}':`, uploadResult.error.message);
-      return null;
+      return { publicImageUrl: null, storagePath: filePath };
     }
 
     const { data: publicUrlData } = supabase.storage.from(targetBucket).getPublicUrl(filePath);
@@ -97,16 +99,7 @@ export async function uploadMediaToSupabaseStorage(file: File): Promise<string |
 
     console.log('SUPABASE PUBLIC URL:', publicImageUrl);
 
-    if (
-      publicImageUrl &&
-      publicImageUrl.startsWith('https://') &&
-      !publicImageUrl.startsWith('blob:') &&
-      !publicImageUrl.startsWith('data:')
-    ) {
-      return publicImageUrl;
-    }
-
-    return publicImageUrl;
+    return { publicImageUrl, storagePath: filePath };
   } catch (err) {
     console.warn('Failed to upload file to Supabase Storage:', err);
     return null;
