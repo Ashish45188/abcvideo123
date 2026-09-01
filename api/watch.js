@@ -51,15 +51,21 @@ export default async function handler(req, res) {
               description = link.description;
             }
 
-            if (link.media_type === 'photo' && link.media_url) {
-              imageUrl = link.media_url;
-            } else if (link.thumbnail_url) {
+            const isValidImageUrl = (url) => {
+              if (!url || typeof url !== 'string') return false;
+              if (url.startsWith('data:') || url.startsWith('blob:')) return false;
+              return true;
+            };
+
+            if (link.thumbnail_url && isValidImageUrl(link.thumbnail_url)) {
               imageUrl = link.thumbnail_url;
-            } else if (link.media_type === 'pdf') {
-              imageUrl = link.thumbnail_url || 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80';
+            } else if (link.media_type === 'photo' && link.media_url && isValidImageUrl(link.media_url)) {
+              imageUrl = link.media_url;
             } else if (link.youtube_video_id) {
               imageUrl = `https://img.youtube.com/vi/${link.youtube_video_id}/hqdefault.jpg`;
-            } else if (link.media_url && link.media_url.match(/\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i)) {
+            } else if (link.media_type === 'pdf') {
+              imageUrl = 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80';
+            } else if (link.media_url && isValidImageUrl(link.media_url) && link.media_url.match(/\.(jpeg|jpg|png|gif|webp)(\?.*)?$/i)) {
               imageUrl = link.media_url;
             }
           }
@@ -70,8 +76,10 @@ export default async function handler(req, res) {
     }
 
     // Ensure absolute image URL with https
-    if (imageUrl.startsWith('/')) {
-      imageUrl = `${proto}://${host}${imageUrl}`;
+    if (imageUrl.startsWith('//')) {
+      imageUrl = `https:${imageUrl}`;
+    } else if (imageUrl.startsWith('/')) {
+      imageUrl = `https://${host}${imageUrl}`;
     } else if (imageUrl.startsWith('http://')) {
       imageUrl = imageUrl.replace('http://', 'https://');
     }
