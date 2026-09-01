@@ -305,9 +305,11 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
               <h3 className="text-xl font-bold uppercase tracking-wider text-white font-mono">
                 Content Created Successfully
               </h3>
-              <p className="text-xs text-[#8E8E96] font-mono">
-                Your public item URL is generated and ready to share.
-              </p>
+              <div className="text-xs text-[#D1FF26] font-mono space-y-1 pt-1">
+                <p>✓ Image uploaded</p>
+                <p>✓ Thumbnail URL generated</p>
+                <p>✓ Shareable URL generated</p>
+              </div>
             </div>
 
             {/* Title & Shareable URL details */}
@@ -321,25 +323,20 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
 
               <div>
                 <span className="text-[10px] font-bold text-[#8E8E96] uppercase tracking-wider block mb-1">
-                  Shareable Link:
+                  Shareable URL:
                 </span>
-                <div className="flex items-center gap-2 bg-[#121215] rounded-xl p-2 border border-[#2A2A30]">
-                  <input
-                    type="text"
-                    readOnly
-                    value={shareUrl}
-                    className="bg-transparent text-xs text-[#F0F0F2] flex-1 outline-none px-2 font-mono truncate"
-                  />
+                <p className="text-xs text-[#D1FF26] font-mono truncate mb-2">{shareUrl}</p>
+                <div className="flex items-center gap-2">
                   <button
                     onClick={handleCopy}
-                    className="px-3 py-1.5 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                    className="flex-1 py-2 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Copied' : 'Copy Link'}</span>
                   </button>
                   <button
                     onClick={handleWhatsAppShare}
-                    className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-md"
+                    className="flex-1 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md"
                   >
                     <Share2 className="w-3.5 h-3.5" />
                     <span>Share on WhatsApp</span>
