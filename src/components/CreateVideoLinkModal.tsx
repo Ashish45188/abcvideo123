@@ -86,9 +86,6 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
   baseUrl,
 }) => {
   const [mediaType, setMediaType] = useState<MediaType>('photo');
-  const [photoInputMode, setPhotoInputMode] = useState<'upload' | 'url'>('upload');
-  const [videoInputMode, setVideoInputMode] = useState<'upload' | 'url'>('upload');
-  const [pdfInputMode, setPdfInputMode] = useState<'upload' | 'url'>('upload');
 
   // Input states
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -192,21 +189,21 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
         return;
       }
 
-      // If a local file was uploaded and directMediaUrl is base64 data URL
-      if (selectedFile && directMediaUrl.startsWith('data:')) {
+      // If a local file was selected or directMediaUrl is base64 data URL
+      if (selectedFile) {
         setIsSubmitting(true);
         const uploadedStorageUrl = await uploadMediaToSupabaseStorage(selectedFile);
         if (uploadedStorageUrl) {
           finalMediaUrl = uploadedStorageUrl;
         } else {
-          setError('WhatsApp preview requires a public HTTPS URL. Please connect Supabase Storage or select the "Image URL" tab to provide a public image link.');
+          setError('WhatsApp preview requires a public HTTPS URL. Please connect Supabase Storage.');
           setIsSubmitting(false);
           return;
         }
       }
 
       if (finalMediaUrl.startsWith('data:') || finalMediaUrl.startsWith('blob:')) {
-        setError('WhatsApp preview requires a public HTTPS URL. Base64 or Blob URLs cannot be previewed by WhatsApp. Please connect Supabase Storage or use a public image URL.');
+        setError('WhatsApp preview requires a public HTTPS URL. Base64 or Blob URLs cannot be previewed by WhatsApp. Please connect Supabase Storage.');
         setIsSubmitting(false);
         return;
       }
@@ -214,11 +211,17 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      const thumbnailUrl = mediaType === 'photo' ? finalMediaUrl : mediaType === 'pdf' ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80' : undefined;
+      const previewImageUrl = thumbnailUrl || finalMediaUrl;
+
+      console.log('Database thumbnail_url:', thumbnailUrl);
+      console.log('WhatsApp preview image URL:', previewImageUrl);
+
       const result = await onSubmit({
         media_type: mediaType,
         youtube_url: mediaType === 'youtube' ? youtubeUrl : undefined,
         media_url: mediaType !== 'youtube' ? finalMediaUrl : undefined,
-        thumbnail_url: mediaType === 'photo' ? finalMediaUrl : mediaType === 'pdf' ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80' : undefined,
+        thumbnail_url: thumbnailUrl,
         custom_name: customName,
         description: description,
       });
@@ -504,75 +507,40 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                     <FileText className="w-4 h-4 text-[#D1FF26]" />
                     PDF Document Source
                   </span>
-                  <div className="flex bg-[#0A0A0B] p-0.5 rounded-lg border border-[#2A2A30] text-[11px] font-mono">
-                    <button
-                      type="button"
-                      onClick={() => setPdfInputMode('upload')}
-                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                        pdfInputMode === 'upload' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
-                      }`}
-                    >
-                      Upload File
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPdfInputMode('url')}
-                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                        pdfInputMode === 'url' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
-                      }`}
-                    >
-                      PDF URL
-                    </button>
-                  </div>
                 </div>
 
-                {pdfInputMode === 'upload' ? (
-                  <div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept="application/pdf"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
-                        <UploadCloud className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                          Click to Browse or Drop PDF Document
-                        </p>
-                        <p className="text-[11px] text-[#8E8E96] font-mono">
-                          PDF files (Up to 15MB)
-                        </p>
-                      </div>
-                      {uploadedFileName && (
-                        <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span className="truncate max-w-xs">{uploadedFileName}</span>
-                          <span className="text-[#8E8E96]">({uploadedFileSize})</span>
-                        </div>
-                      )}
+                <div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="application/pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
+                      <UploadCloud className="w-5 h-5" />
                     </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                        Click to Browse or Drop PDF Document
+                      </p>
+                      <p className="text-[11px] text-[#8E8E96] font-mono">
+                        PDF files (Up to 15MB)
+                      </p>
+                    </div>
+                    {uploadedFileName && (
+                      <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-xs">{uploadedFileName}</span>
+                        <span className="text-[#8E8E96]">({uploadedFileSize})</span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <input
-                      type="url"
-                      placeholder="https://example.com/document.pdf"
-                      value={directMediaUrl}
-                      onChange={(e) => {
-                        setDirectMediaUrl(e.target.value);
-                        setPreviewMediaUrl(e.target.value);
-                      }}
-                      className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
-                    />
-                  </div>
-                )}
+                </div>
 
                 {/* Live Preview */}
                 {previewMediaUrl && (
@@ -599,77 +567,42 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                     <ImageIcon className="w-4 h-4 text-[#D1FF26]" />
-                    Photo / Thumbnail Source
+                    Select Photo File
                   </span>
-                  <div className="flex bg-[#0A0A0B] p-0.5 rounded-lg border border-[#2A2A30] text-[11px] font-mono">
-                    <button
-                      type="button"
-                      onClick={() => setPhotoInputMode('upload')}
-                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                        photoInputMode === 'upload' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
-                      }`}
-                    >
-                      Upload File
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPhotoInputMode('url')}
-                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                        photoInputMode === 'url' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
-                      }`}
-                    >
-                      Image URL
-                    </button>
-                  </div>
                 </div>
 
-                {photoInputMode === 'upload' ? (
-                  <div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
-                        <UploadCloud className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                          Click to Browse or Drop Photo
-                        </p>
-                        <p className="text-[11px] text-[#8E8E96] font-mono">
-                          PNG, JPG, WebP or GIF (Up to 15MB)
-                        </p>
-                      </div>
-                      {uploadedFileName && (
-                        <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span className="truncate max-w-xs">{uploadedFileName}</span>
-                          <span className="text-[#8E8E96]">({uploadedFileSize})</span>
-                        </div>
-                      )}
+                <div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/png, image/jpeg, image/jpg, image/webp, image/gif"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
+                      <UploadCloud className="w-5 h-5" />
                     </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                        Click to Browse or Drop Photo
+                      </p>
+                      <p className="text-[11px] text-[#8E8E96] font-mono">
+                        PNG, JPG, WebP or GIF (Up to 15MB)
+                      </p>
+                    </div>
+                    {uploadedFileName && (
+                      <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-xs">{uploadedFileName}</span>
+                        <span className="text-[#8E8E96]">({uploadedFileSize})</span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <input
-                      type="url"
-                      placeholder="https://example.com/image.jpg"
-                      value={directMediaUrl}
-                      onChange={(e) => {
-                        setDirectMediaUrl(e.target.value);
-                        setPreviewMediaUrl(e.target.value);
-                      }}
-                      className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
-                    />
-                  </div>
-                )}
+                </div>
 
                 {/* Quick Presets */}
                 <div className="space-y-1.5 pt-1">
@@ -720,75 +653,40 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                     <Film className="w-4 h-4 text-[#D1FF26]" />
                     Direct Video Source (MP4 / WebM)
                   </span>
-                  <div className="flex bg-[#0A0A0B] p-0.5 rounded-lg border border-[#2A2A30] text-[11px] font-mono">
-                    <button
-                      type="button"
-                      onClick={() => setVideoInputMode('upload')}
-                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                        videoInputMode === 'upload' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
-                      }`}
-                    >
-                      Upload MP4
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setVideoInputMode('url')}
-                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                        videoInputMode === 'url' ? 'bg-[#18181C] text-[#D1FF26] font-bold' : 'text-[#8E8E96]'
-                      }`}
-                    >
-                      Video Stream URL
-                    </button>
-                  </div>
                 </div>
 
-                {videoInputMode === 'upload' ? (
-                  <div>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      accept="video/mp4, video/webm, video/ogg"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
-                        <FileVideo className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                          Click to Browse or Drop MP4 Video
-                        </p>
-                        <p className="text-[11px] text-[#8E8E96] font-mono">
-                          Standard MP4 or WebM video file (Up to 35MB)
-                        </p>
-                      </div>
-                      {uploadedFileName && (
-                        <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span className="truncate max-w-xs">{uploadedFileName}</span>
-                          <span className="text-[#8E8E96]">({uploadedFileSize})</span>
-                        </div>
-                      )}
+                <div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="video/mp4, video/webm, video/ogg"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-[#2A2A30] hover:border-[#D1FF26] bg-[#0A0A0B] p-5 rounded-2xl text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-[#18181C] group-hover:bg-[#141810] text-[#8E8E96] group-hover:text-[#D1FF26] border border-[#2A2A30] group-hover:border-[#304018] flex items-center justify-center transition">
+                      <FileVideo className="w-5 h-5" />
                     </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                        Click to Browse or Drop MP4 Video
+                      </p>
+                      <p className="text-[11px] text-[#8E8E96] font-mono">
+                        Standard MP4 or WebM video file (Up to 35MB)
+                      </p>
+                    </div>
+                    {uploadedFileName && (
+                      <div className="mt-2 bg-[#141810] px-3 py-1 rounded-lg border border-[#304018] text-[#D1FF26] text-xs font-mono flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-xs">{uploadedFileName}</span>
+                        <span className="text-[#8E8E96]">({uploadedFileSize})</span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <input
-                      type="url"
-                      placeholder="https://example.com/video.mp4"
-                      value={directMediaUrl}
-                      onChange={(e) => {
-                        setDirectMediaUrl(e.target.value);
-                        setPreviewMediaUrl(e.target.value);
-                      }}
-                      className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
-                    />
-                  </div>
-                )}
+                </div>
 
                 {/* Quick Presets */}
                 <div className="space-y-1.5 pt-1">
