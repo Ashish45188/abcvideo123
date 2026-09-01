@@ -62,3 +62,32 @@ export function getSupabaseClient(): SupabaseClient | null {
 
   return supabaseInstance;
 }
+
+export async function uploadMediaToSupabaseStorage(file: File): Promise<string | null> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+
+  try {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const filePath = `uploads/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('media')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn('Supabase Storage upload error:', error.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(filePath);
+    return publicUrlData?.publicUrl || null;
+  } catch (err) {
+    console.warn('Failed to upload file to Supabase Storage:', err);
+    return null;
+  }
+}

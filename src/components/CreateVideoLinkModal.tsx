@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CreateVideoLinkInput, VideoLink, MediaType } from '../types';
 import { extractYouTubeVideoId, isValidYouTubeUrl, getYouTubeThumbnailUrl } from '../utils/youtube';
+import { uploadMediaToSupabaseStorage } from '../lib/supabase';
 import {
   Link2,
   Sparkles,
@@ -94,6 +95,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
   const [directMediaUrl, setDirectMediaUrl] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [uploadedFileSize, setUploadedFileSize] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
 
   const [customName, setCustomName] = useState('');
@@ -134,6 +136,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
     }
 
     setError(null);
+    setSelectedFile(file);
     setUploadedFileName(file.name);
     setUploadedFileSize((file.size / (1024 * 1024)).toFixed(2) + ' MB');
 
@@ -176,24 +179,35 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
       return;
     }
 
+    let finalMediaUrl = directMediaUrl;
+
     if (mediaType === 'youtube') {
       if (!isValidYouTubeUrl(youtubeUrl)) {
         setError('Please provide a valid YouTube URL (watch, share, shorts, or embed).');
         return;
       }
-    } else if (mediaType === 'photo') {
+    } else {
       if (!directMediaUrl.trim()) {
-        setError('Please select an image file or provide a valid photo URL.');
+        setError(`Please select a ${mediaType} file or provide a valid ${mediaType} URL.`);
         return;
       }
-    } else if (mediaType === 'pdf') {
-      if (!directMediaUrl.trim()) {
-        setError('Please select a PDF file or provide a valid PDF URL.');
-        return;
+
+      // If a local file was uploaded and directMediaUrl is base64 data URL
+      if (selectedFile && directMediaUrl.startsWith('data:')) {
+        setIsSubmitting(true);
+        const uploadedStorageUrl = await uploadMediaToSupabaseStorage(selectedFile);
+        if (uploadedStorageUrl) {
+          finalMediaUrl = uploadedStorageUrl;
+        } else {
+          setError('WhatsApp preview requires a public HTTPS URL. Please connect Supabase Storage or select the "Image URL" tab to provide a public image link.');
+          setIsSubmitting(false);
+          return;
+        }
       }
-    } else if (mediaType === 'video') {
-      if (!directMediaUrl.trim()) {
-        setError('Please select a video file or provide a valid video stream URL.');
+
+      if (finalMediaUrl.startsWith('data:') || finalMediaUrl.startsWith('blob:')) {
+        setError('WhatsApp preview requires a public HTTPS URL. Base64 or Blob URLs cannot be previewed by WhatsApp. Please connect Supabase Storage or use a public image URL.');
+        setIsSubmitting(false);
         return;
       }
     }
@@ -203,8 +217,8 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
       const result = await onSubmit({
         media_type: mediaType,
         youtube_url: mediaType === 'youtube' ? youtubeUrl : undefined,
-        media_url: mediaType !== 'youtube' ? directMediaUrl : undefined,
-        thumbnail_url: mediaType === 'photo' ? directMediaUrl : mediaType === 'pdf' ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80' : undefined,
+        media_url: mediaType !== 'youtube' ? finalMediaUrl : undefined,
+        thumbnail_url: mediaType === 'photo' ? finalMediaUrl : mediaType === 'pdf' ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80' : undefined,
         custom_name: customName,
         description: description,
       });
