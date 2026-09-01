@@ -6,20 +6,54 @@ const STORAGE_KEY_KEY = 'geovideo_supabase_anon_key';
 
 export function getSupabaseConfig(): { url: string; anonKey: string; isConfigured: boolean } {
   const metaEnv = typeof import.meta !== 'undefined' ? (import.meta as any).env || {} : {};
-  const envUrl = metaEnv.VITE_SUPABASE_URL || '';
-  const envKey = metaEnv.VITE_SUPABASE_ANON_KEY || '';
+  const processEnv = typeof process !== 'undefined' ? (process.env as any) || {} : {};
 
-  const localUrl = localStorage.getItem(STORAGE_URL_KEY) || '';
-  const localKey = localStorage.getItem(STORAGE_KEY_KEY) || '';
+  const envUrl =
+    metaEnv.VITE_SUPABASE_URL ||
+    metaEnv.SUPABASE_URL ||
+    metaEnv.VITE_PUBLIC_SUPABASE_URL ||
+    metaEnv.PUBLIC_SUPABASE_URL ||
+    processEnv.VITE_SUPABASE_URL ||
+    processEnv.SUPABASE_URL ||
+    processEnv.VITE_PUBLIC_SUPABASE_URL ||
+    processEnv.PUBLIC_SUPABASE_URL ||
+    '';
 
-  const url = localUrl || envUrl;
-  const anonKey = localKey || envKey;
+  const envKey =
+    metaEnv.VITE_SUPABASE_ANON_KEY ||
+    metaEnv.SUPABASE_ANON_KEY ||
+    metaEnv.VITE_PUBLIC_SUPABASE_ANON_KEY ||
+    metaEnv.PUBLIC_SUPABASE_ANON_KEY ||
+    processEnv.VITE_SUPABASE_ANON_KEY ||
+    processEnv.SUPABASE_ANON_KEY ||
+    processEnv.VITE_PUBLIC_SUPABASE_ANON_KEY ||
+    processEnv.PUBLIC_SUPABASE_ANON_KEY ||
+    '';
+
+  let localUrl = '';
+  let localKey = '';
+  if (typeof localStorage !== 'undefined') {
+    localUrl = localStorage.getItem(STORAGE_URL_KEY) || '';
+    localKey = localStorage.getItem(STORAGE_KEY_KEY) || '';
+  }
+
+  const url = (localUrl || envUrl).trim();
+  const anonKey = (localKey || envKey).trim();
+
+  let isValidUrl = false;
+  try {
+    if (url) {
+      const parsed = new URL(url);
+      isValidUrl = parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    }
+  } catch {
+    isValidUrl = false;
+  }
 
   const isConfigured = Boolean(
     url &&
     anonKey &&
-    url.startsWith('https://') &&
-    url.includes('supabase.co') &&
+    isValidUrl &&
     anonKey.length > 20
   );
 
@@ -27,10 +61,14 @@ export function getSupabaseConfig(): { url: string; anonKey: string; isConfigure
 }
 
 export function saveSupabaseConfig(url: string, anonKey: string): void {
-  if (url) localStorage.setItem(STORAGE_URL_KEY, url.trim());
+  if (typeof localStorage === 'undefined') return;
+  const trimmedUrl = url.trim();
+  const trimmedKey = anonKey.trim();
+
+  if (trimmedUrl) localStorage.setItem(STORAGE_URL_KEY, trimmedUrl);
   else localStorage.removeItem(STORAGE_URL_KEY);
 
-  if (anonKey) localStorage.setItem(STORAGE_KEY_KEY, anonKey.trim());
+  if (trimmedKey) localStorage.setItem(STORAGE_KEY_KEY, trimmedKey);
   else localStorage.removeItem(STORAGE_KEY_KEY);
 }
 
@@ -41,6 +79,8 @@ export function getSupabaseClient(): SupabaseClient | null {
   const { url, anonKey, isConfigured } = getSupabaseConfig();
 
   if (!isConfigured) {
+    supabaseInstance = null;
+    currentConfigKey = '';
     return null;
   }
 
@@ -77,6 +117,11 @@ export async function uploadMediaToSupabaseStorage(
   file: File
 ): Promise<UploadMediaResult> {
   console.log('Selected file:', file);
+
+  const config = getSupabaseConfig();
+  console.log('Supabase configured:', config.isConfigured);
+  console.log('Supabase URL present:', !!config.url);
+  console.log('Supabase anon key present:', !!config.anonKey);
 
   const supabase = getSupabaseClient();
   if (!supabase) {
