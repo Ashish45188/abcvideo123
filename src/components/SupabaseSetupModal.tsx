@@ -109,7 +109,22 @@ CREATE INDEX IF NOT EXISTS idx_video_links_share_id ON public.video_links(share_
 CREATE INDEX IF NOT EXISTS idx_visitor_sessions_video_link ON public.visitor_sessions(video_link_id);
 CREATE INDEX IF NOT EXISTS idx_visitor_sessions_status ON public.visitor_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_location_updates_session ON public.location_updates(session_id);
-CREATE INDEX IF NOT EXISTS idx_location_updates_created_at ON public.location_updates(created_at);`;
+CREATE INDEX IF NOT EXISTS idx_location_updates_created_at ON public.location_updates(created_at);
+
+-- 7. Supabase Storage Setup & RLS Policies for whatsapp-thumbnails
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('whatsapp-thumbnails', 'whatsapp-thumbnails', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "Public Select whatsapp-thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow upload whatsapp-thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow update whatsapp-thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow delete whatsapp-thumbnails" ON storage.objects;
+
+CREATE POLICY "Public Select whatsapp-thumbnails" ON storage.objects FOR SELECT TO public USING (bucket_id = 'whatsapp-thumbnails');
+CREATE POLICY "Allow upload whatsapp-thumbnails" ON storage.objects FOR INSERT TO anon, authenticated WITH CHECK (bucket_id = 'whatsapp-thumbnails');
+CREATE POLICY "Allow update whatsapp-thumbnails" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'whatsapp-thumbnails') WITH CHECK (bucket_id = 'whatsapp-thumbnails');
+CREATE POLICY "Allow delete whatsapp-thumbnails" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'whatsapp-thumbnails');`;
 
 export const SupabaseSetupModal: React.FC<SupabaseSetupModalProps> = ({
   isOpen,

@@ -152,3 +152,43 @@ CREATE INDEX IF NOT EXISTS idx_visitor_sessions_video_link ON public.visitor_ses
 CREATE INDEX IF NOT EXISTS idx_visitor_sessions_status ON public.visitor_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_location_updates_session ON public.location_updates(session_id);
 CREATE INDEX IF NOT EXISTS idx_location_updates_created_at ON public.location_updates(created_at);
+
+-- ================================================================
+-- Supabase Storage Setup & RLS Policies for whatsapp-thumbnails
+-- ================================================================
+
+-- Create or update public storage bucket for whatsapp-thumbnails
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('whatsapp-thumbnails', 'whatsapp-thumbnails', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Drop existing policies if needed to avoid duplicate policy errors on re-run
+DROP POLICY IF EXISTS "Public Select whatsapp-thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow upload whatsapp-thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow update whatsapp-thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow delete whatsapp-thumbnails" ON storage.objects;
+
+-- 1. READ: Anyone (public) can read objects in whatsapp-thumbnails so WhatsApp preview works
+CREATE POLICY "Public Select whatsapp-thumbnails"
+    ON storage.objects FOR SELECT
+    TO public
+    USING (bucket_id = 'whatsapp-thumbnails');
+
+-- 2. INSERT: Application client (anon, authenticated) can upload thumbnails
+CREATE POLICY "Allow upload whatsapp-thumbnails"
+    ON storage.objects FOR INSERT
+    TO anon, authenticated
+    WITH CHECK (bucket_id = 'whatsapp-thumbnails');
+
+-- 3. UPDATE: Restricted to authenticated admins/owners
+CREATE POLICY "Allow update whatsapp-thumbnails"
+    ON storage.objects FOR UPDATE
+    TO authenticated
+    USING (bucket_id = 'whatsapp-thumbnails')
+    WITH CHECK (bucket_id = 'whatsapp-thumbnails');
+
+-- 4. DELETE: Restricted to authenticated admins/owners
+CREATE POLICY "Allow delete whatsapp-thumbnails"
+    ON storage.objects FOR DELETE
+    TO authenticated
+    USING (bucket_id = 'whatsapp-thumbnails');
