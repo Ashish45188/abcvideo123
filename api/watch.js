@@ -3,19 +3,28 @@ import path from 'path';
 
 export default async function handler(req, res) {
   try {
-    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const queryWatch = req.query && (req.query.watch || req.query.share_id);
-    const urlWatch = url.searchParams.get('watch') || url.searchParams.get('share_id');
-    const shareId = queryWatch || urlWatch || '';
-
-    let title = 'Shared Document';
-    let description = 'Tap to view the shared document.';
-    let imageUrl = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
-
     const host = req.headers['x-forwarded-host'] || req.headers.host || 'geovideo-tracker.vercel.app';
     const proto = req.headers['x-forwarded-proto'] || 'https';
-    const siteUrl = shareId
-      ? `${proto}://${host}/?watch=${encodeURIComponent(shareId)}`
+
+    // Parse URL path and query parameters
+    const requestUrl = new URL(req.url, `${proto}://${host}`);
+
+    // Extract share_id / watch from query params or URL path (e.g., /watch/abc123 or /item/abc123)
+    let shareId = req.query?.watch || req.query?.share_id || requestUrl.searchParams.get('watch') || requestUrl.searchParams.get('share_id') || '';
+
+    if (!shareId && requestUrl.pathname) {
+      const match = requestUrl.pathname.match(/\/(?:watch|item)\/([^/]+)/);
+      if (match && match[1]) {
+        shareId = match[1];
+      }
+    }
+
+    let title = 'Shared Media Item';
+    let description = 'Tap to view this shared item.';
+    let imageUrl = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
+
+    const canonicalUrl = shareId
+      ? `${proto}://${host}/watch/${encodeURIComponent(shareId)}`
       : `${proto}://${host}${req.url}`;
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -42,10 +51,10 @@ export default async function handler(req, res) {
               description = link.description;
             }
 
-            if (link.media_type === 'photo' && link.media_url) {
-              imageUrl = link.media_url;
-            } else if (link.thumbnail_url) {
+            if (link.thumbnail_url) {
               imageUrl = link.thumbnail_url;
+            } else if (link.media_type === 'photo' && link.media_url) {
+              imageUrl = link.media_url;
             } else if (link.media_type === 'pdf') {
               imageUrl = link.thumbnail_url || 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80';
             } else if (link.youtube_video_id) {
@@ -82,7 +91,7 @@ export default async function handler(req, res) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GeoVideo Tracker</title>
+    <title>Shared Content</title>
   </head>
   <body>
     <div id="root"></div>
@@ -100,7 +109,7 @@ export default async function handler(req, res) {
     const safeTitle = escapeAttr(title);
     const safeDesc = escapeAttr(description);
     const safeImage = escapeAttr(imageUrl);
-    const safeUrl = escapeAttr(siteUrl);
+    const safeUrl = escapeAttr(canonicalUrl);
 
     // Replace <title>
     html = html.replace(/<title>.*?<\/title>/i, `<title>${safeTitle}</title>`);
@@ -122,16 +131,13 @@ export default async function handler(req, res) {
 
     html = setOrReplaceMeta(html, 'name', 'description', safeDesc);
 
-    html = setOrReplaceMeta(html, 'property', 'og:type', 'website');
-    html = setOrReplaceMeta(html, 'property', 'og:site_name', 'GeoVideo Tracker');
     html = setOrReplaceMeta(html, 'property', 'og:title', safeTitle);
     html = setOrReplaceMeta(html, 'property', 'og:description', safeDesc);
     html = setOrReplaceMeta(html, 'property', 'og:image', safeImage);
-    html = setOrReplaceMeta(html, 'property', 'og:image:secure_url', safeImage);
-    html = setOrReplaceMeta(html, 'property', 'og:image:type', 'image/jpeg');
-    html = setOrReplaceMeta(html, 'property', 'og:image:width', '1200');
-    html = setOrReplaceMeta(html, 'property', 'og:image:height', '630');
     html = setOrReplaceMeta(html, 'property', 'og:url', safeUrl);
+    html = setOrReplaceMeta(html, 'property', 'og:type', 'website');
+    html = setOrReplaceMeta(html, 'property', 'og:site_name', host);
+    html = setOrReplaceMeta(html, 'property', 'og:image:secure_url', safeImage);
 
     html = setOrReplaceMeta(html, 'name', 'twitter:card', 'summary_large_image');
     html = setOrReplaceMeta(html, 'name', 'twitter:title', safeTitle);

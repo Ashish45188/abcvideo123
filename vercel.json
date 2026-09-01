@@ -5,6 +5,10 @@
       "destination": "/api/watch?watch=:share_id*"
     },
     {
+      "source": "/item/:share_id*",
+      "destination": "/api/watch?watch=:share_id*"
+    },
+    {
       "source": "/(.*)",
       "has": [
         {

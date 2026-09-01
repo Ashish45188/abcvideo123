@@ -17,7 +17,8 @@ import {
   FileVideo,
   FileImage,
   FileText,
-  RefreshCw,
+  Share2,
+  ExternalLink,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -125,7 +126,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Size limit check: 25MB for video, 12MB for photo/PDF
+    // Size limit check: 35MB for video, 15MB for photo/PDF
     const maxBytes = (mediaType === 'photo' || mediaType === 'pdf') ? 15 * 1024 * 1024 : 35 * 1024 * 1024;
     if (file.size > maxBytes) {
       setError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max allowed size is ${mediaType === 'video' ? '35MB' : '15MB'}.`);
@@ -228,13 +229,43 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
     setError(null);
   };
 
-  const shareUrl = createdLink ? `${baseUrl}?watch=${createdLink.share_id}` : '';
+  // Format public watch URL (e.g. https://mydomain.com/watch/qww5vmet)
+  const getPublicShareUrl = (link: VideoLink) => {
+    if (!baseUrl) return '';
+    const cleanBase = baseUrl.replace(/\/$/, '');
+    return `${cleanBase}/watch/${link.share_id}`;
+  };
+
+  const shareUrl = createdLink ? getPublicShareUrl(createdLink) : '';
 
   const handleCopy = () => {
     if (!shareUrl) return;
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleWhatsAppShare = () => {
+    if (!shareUrl) return;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(shareUrl)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const getItemThumbnail = (link: VideoLink) => {
+    if (link.thumbnail_url) return link.thumbnail_url;
+    if (link.media_type === 'photo' && link.media_url) return link.media_url;
+    if (link.youtube_video_id) return getYouTubeThumbnailUrl(link.youtube_video_id);
+    return 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
+  };
+
+  const getCleanDomain = () => {
+    try {
+      if (!shareUrl) return 'mydomain.com';
+      const u = new URL(shareUrl);
+      return u.hostname;
+    } catch {
+      return 'mydomain.com';
+    }
   };
 
   return (
@@ -251,78 +282,93 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
         </button>
 
         {createdLink ? (
-          /* SUCCESS STATE - Generated Link & QR Code */
+          /* SUCCESS STATE - Content Created Successfully & WhatsApp Preview */
           <div className="space-y-6 animate-fadeIn">
             <div className="text-center space-y-2">
-              <div className="w-12 h-12 bg-[#18181C] text-[#D1FF26] rounded-2xl flex items-center justify-center mx-auto border border-[#2A2A30] shadow-lg">
+              <div className="w-12 h-12 bg-[#18181C] text-[#25D366] rounded-2xl flex items-center justify-center mx-auto border border-[#2A2A30] shadow-lg">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold uppercase tracking-wider text-white font-mono">
-                {createdLink.media_type === 'photo'
-                  ? 'PHOTO TRACKING LINK READY'
-                  : createdLink.media_type === 'pdf'
-                  ? 'PDF DOCUMENT TRACKING LINK READY'
-                  : createdLink.media_type === 'video'
-                  ? 'DIRECT VIDEO TRACKING LINK READY'
-                  : 'YOUTUBE TRACKING LINK READY'}
+                Content Created Successfully
               </h3>
               <p className="text-xs text-[#8E8E96] font-mono">
-                Share this link with your visitor. Location consent will be required before opening.
+                Your public item URL is generated and ready to share.
               </p>
             </div>
 
-            {/* Media Badge Preview */}
-            <div className="bg-[#0A0A0B] p-3 rounded-2xl border border-[#222226] flex items-center gap-3 font-mono">
-              <div className="w-10 h-10 rounded-xl bg-[#141810] border border-[#304018] flex items-center justify-center text-[#D1FF26] shrink-0">
-                {createdLink.media_type === 'photo' ? (
-                  <ImageIcon className="w-5 h-5" />
-                ) : createdLink.media_type === 'pdf' ? (
-                  <FileText className="w-5 h-5" />
-                ) : createdLink.media_type === 'video' ? (
-                  <Film className="w-5 h-5" />
-                ) : (
-                  <Play className="w-5 h-5 fill-current" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-bold text-[#D1FF26] uppercase tracking-widest block">
-                  {createdLink.media_type === 'photo'
-                    ? 'PROTECTED PHOTO'
-                    : createdLink.media_type === 'pdf'
-                    ? 'PROTECTED PDF DOCUMENT'
-                    : createdLink.media_type === 'video'
-                    ? 'PROTECTED DIRECT VIDEO'
-                    : 'PROTECTED YOUTUBE'}
+            {/* Title & Shareable URL details */}
+            <div className="space-y-3 font-mono bg-[#0A0A0B] p-4 rounded-2xl border border-[#222226]">
+              <div>
+                <span className="text-[10px] font-bold text-[#8E8E96] uppercase tracking-wider block">
+                  Title:
                 </span>
-                <p className="text-xs font-bold text-white truncate">{createdLink.custom_name}</p>
+                <p className="text-sm font-bold text-white truncate">{createdLink.custom_name}</p>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold text-[#8E8E96] uppercase tracking-wider block mb-1">
+                  Shareable Link:
+                </span>
+                <div className="flex items-center gap-2 bg-[#121215] rounded-xl p-2 border border-[#2A2A30]">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareUrl}
+                    className="bg-transparent text-xs text-[#F0F0F2] flex-1 outline-none px-2 font-mono truncate"
+                  />
+                  <button
+                    onClick={handleCopy}
+                    className="px-3 py-1.5 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition shrink-0 cursor-pointer"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? 'Copied' : 'Copy Link'}</span>
+                  </button>
+                  <button
+                    onClick={handleWhatsAppShare}
+                    className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow-md"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Share on WhatsApp</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Simulated WhatsApp Preview Card */}
+            <div className="space-y-1.5 font-mono">
+              <span className="text-xs font-bold text-[#8E8E96] uppercase tracking-wider block">
+                Preview:
+              </span>
+              <div className="bg-[#0b141a] rounded-2xl border border-[#222226] overflow-hidden shadow-xl p-3 space-y-2 max-w-sm mx-auto">
+                <div className="relative rounded-xl overflow-hidden bg-black/40 aspect-video border border-white/10">
+                  <img
+                    src={getItemThumbnail(createdLink)}
+                    alt={createdLink.custom_name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+                <div className="px-1 space-y-1">
+                  <h4 className="text-sm font-bold text-[#e9edef] line-clamp-1 font-sans">
+                    {createdLink.custom_name}
+                  </h4>
+                  {createdLink.description && (
+                    <p className="text-xs text-[#8696a0] line-clamp-2 font-sans">
+                      {createdLink.description}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-[#8696a0] font-mono lowercase truncate pt-0.5">
+                    {getCleanDomain()}
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* QR Code Canvas */}
-            <div className="flex justify-center p-4 bg-white rounded-2xl border border-white/20 shadow-inner max-w-xs mx-auto">
-              <QRCodeSVG value={shareUrl} size={160} level="H" includeMargin={true} />
-            </div>
-
-            {/* Share URL Box */}
-            <div className="space-y-1.5 font-mono">
-              <label className="text-xs font-bold text-[#8E8E96] uppercase tracking-wider">
-                Shareable URL
-              </label>
-              <div className="flex items-center gap-2 bg-[#0A0A0B] rounded-xl p-2 border border-[#2A2A30]">
-                <input
-                  type="text"
-                  readOnly
-                  value={shareUrl}
-                  className="bg-transparent text-xs text-[#F0F0F2] flex-1 outline-none px-2 font-mono truncate"
-                />
-                <button
-                  onClick={handleCopy}
-                  className="px-3 py-1.5 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 transition shrink-0 cursor-pointer"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
+            <div className="flex justify-center p-3 bg-white rounded-2xl border border-white/20 shadow-inner max-w-xs mx-auto">
+              <QRCodeSVG value={shareUrl} size={140} level="H" includeMargin={true} />
             </div>
 
             <div className="flex gap-3 pt-2">
@@ -352,10 +398,10 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
               </div>
               <div>
                 <h3 className="text-lg font-bold uppercase tracking-wider text-white font-mono">
-                  CREATE TRACKING LINK
+                  CREATE PUBLIC ITEM
                 </h3>
                 <p className="text-xs text-[#8E8E96] font-mono">
-                  Send a Photo, Direct Video, or YouTube stream
+                  Upload or enter item details to generate shareable link
                 </p>
               </div>
             </div>
@@ -542,7 +588,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                     <ImageIcon className="w-4 h-4 text-[#D1FF26]" />
-                    Photo Source
+                    Photo / Thumbnail Source
                   </span>
                   <div className="flex bg-[#0A0A0B] p-0.5 rounded-lg border border-[#2A2A30] text-[11px] font-mono">
                     <button
@@ -587,7 +633,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                           Click to Browse or Drop Photo
                         </p>
                         <p className="text-[11px] text-[#8E8E96] font-mono">
-                          PNG, JPG, WebP or GIF (Up to 12MB)
+                          PNG, JPG, WebP or GIF (Up to 15MB)
                         </p>
                       </div>
                       {uploadedFileName && (
@@ -835,7 +881,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
               <input
                 type="text"
                 required
-                placeholder="e.g. My Favorite Photo or Stream"
+                placeholder="e.g. Blunt Air Max Earbuds"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
                 className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition font-mono"
@@ -849,7 +895,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
               </label>
               <textarea
                 rows={2}
-                placeholder="Short note or message displayed on the visitor consent screen..."
+                placeholder="Buy Blunt Air Max | Balanced Sound..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full bg-[#0A0A0B] border border-[#2A2A30] rounded-xl px-3.5 py-2.5 text-xs text-[#F0F0F2] placeholder:text-[#52525B] focus:outline-none focus:border-[#D1FF26] transition resize-none font-sans"
@@ -870,7 +916,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                 )}
                 <span>
                   {isSubmitting
-                    ? 'Generating Tracking Link...'
+                    ? 'Generating Item Link...'
                     : `Generate ${
                         mediaType === 'pdf'
                           ? 'PDF'
@@ -879,7 +925,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                           : mediaType === 'video'
                           ? 'Direct Video'
                           : 'YouTube'
-                      } Tracking Link`}
+                      } Public Link`}
                 </span>
               </button>
             </div>

@@ -16,6 +16,7 @@ import {
   Plus,
   Image as ImageIcon,
   Film,
+  Share2,
 } from 'lucide-react';
 
 interface AdminLinksListProps {
@@ -39,11 +40,22 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  const getPublicShareUrl = (shareId: string) => {
+    const cleanBase = baseUrl.replace(/\/$/, '');
+    return `${cleanBase}/watch/${shareId}`;
+  };
+
   const handleCopy = (shareId: string) => {
-    const url = `${baseUrl}?watch=${shareId}`;
+    const url = getPublicShareUrl(shareId);
     navigator.clipboard.writeText(url);
     setCopiedId(shareId);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleWhatsAppShare = (shareId: string) => {
+    const url = getPublicShareUrl(shareId);
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(url)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
   const getMediaThumbnail = (link: VideoLink) => {
@@ -130,14 +142,14 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold uppercase tracking-wider text-white font-mono">
-                GENERATED TRACKING LINKS
+                GENERATED PUBLIC LINKS
               </h3>
               <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold tracking-widest bg-[#18181C] text-[#D1FF26] border border-[#2A2A30]">
                 {links.length} TOTAL
               </span>
             </div>
             <p className="text-xs text-[#8E8E96] font-mono">
-              Manage Photos, Direct Videos &amp; YouTube streams with consent telemetry
+              Manage item links with dynamic WhatsApp preview cards
             </p>
           </div>
         </div>
@@ -147,7 +159,7 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
           className="self-start sm:self-auto px-3.5 py-2 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer shadow-md"
         >
           <Plus className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-          <span>New Link</span>
+          <span>New Item Link</span>
         </button>
       </div>
 
@@ -158,23 +170,22 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
             <Link2 className="w-6 h-6" />
           </div>
           <h4 className="text-sm font-bold uppercase tracking-wider text-white font-mono">
-            No tracking links created yet
+            No public links created yet
           </h4>
           <p className="text-xs text-[#8E8E96] font-mono max-w-sm mx-auto">
-            Generate your first Photo, Direct Video, or YouTube link to share with visitors and monitor live location.
+            Generate your first item link to share on WhatsApp or view public media content.
           </p>
           <button
             onClick={onCreateNewClick}
             className="mt-2 px-4 py-2 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-xl text-xs font-mono font-bold uppercase tracking-wider inline-flex items-center gap-1.5 transition cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-            Create Tracking Link
+            Create Item Link
           </button>
         </div>
       ) : (
         <div className="divide-y divide-[#222226]">
           {links.map((link) => {
-            const shareUrl = `${baseUrl}?watch=${link.share_id}`;
             const isCopied = copiedId === link.share_id;
             const type = link.media_type || 'youtube';
 
@@ -259,6 +270,16 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
                     )}
                   </button>
 
+                  {/* Share on WhatsApp */}
+                  <button
+                    onClick={() => handleWhatsAppShare(link.share_id)}
+                    className="px-3 py-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-black rounded-xl text-xs font-mono font-bold border border-[#25D366] flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    title="Share item on WhatsApp"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>WhatsApp</span>
+                  </button>
+
                   {/* QR Code trigger */}
                   <button
                     onClick={() => onShowQr(link)}
@@ -273,7 +294,7 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
                   <button
                     onClick={() => onOpenVisitorView(link.share_id)}
                     className="px-3 py-1.5 bg-[#141810] hover:bg-[#1B2412] text-[#D1FF26] rounded-xl text-xs font-mono font-bold tracking-wide border border-[#304018] flex items-center gap-1.5 transition cursor-pointer"
-                    title="Open test visitor view"
+                    title="Open public page"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span>Open Watch</span>
