@@ -51,10 +51,10 @@ export default async function handler(req, res) {
               description = link.description;
             }
 
-            if (link.thumbnail_url) {
-              imageUrl = link.thumbnail_url;
-            } else if (link.media_type === 'photo' && link.media_url) {
+            if (link.media_type === 'photo' && link.media_url) {
               imageUrl = link.media_url;
+            } else if (link.thumbnail_url) {
+              imageUrl = link.thumbnail_url;
             } else if (link.media_type === 'pdf') {
               imageUrl = link.thumbnail_url || 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80';
             } else if (link.youtube_video_id) {

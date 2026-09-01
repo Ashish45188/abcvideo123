@@ -54,7 +54,7 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
 
   const handleWhatsAppShare = (shareId: string) => {
     const url = getPublicShareUrl(shareId);
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(url)}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(url)}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 

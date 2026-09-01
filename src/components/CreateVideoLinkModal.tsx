@@ -247,7 +247,7 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
 
   const handleWhatsAppShare = () => {
     if (!shareUrl) return;
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(shareUrl)}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareUrl)}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
