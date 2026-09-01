@@ -63,15 +63,31 @@ export function getSupabaseClient(): SupabaseClient | null {
   return supabaseInstance;
 }
 
+export interface UploadMediaResult {
+  publicImageUrl: string | null;
+  storagePath: string | null;
+  error?: {
+    message: string;
+    status?: number | string;
+    statusCode?: number | string;
+  } | null;
+}
+
 export async function uploadMediaToSupabaseStorage(
   file: File
-): Promise<{ publicImageUrl: string | null; storagePath: string | null } | null> {
+): Promise<UploadMediaResult> {
   console.log('Selected file:', file);
 
   const supabase = getSupabaseClient();
   if (!supabase) {
     console.warn('Supabase client is not configured.');
-    return null;
+    return {
+      publicImageUrl: null,
+      storagePath: null,
+      error: {
+        message: 'Supabase client is not configured. Please connect Supabase in settings.',
+      },
+    };
   }
 
   try {
@@ -90,8 +106,21 @@ export async function uploadMediaToSupabaseStorage(
     console.log('Supabase upload result:', uploadResult);
 
     if (uploadResult.error) {
-      console.warn(`Supabase Storage upload error for bucket '${targetBucket}':`, uploadResult.error.message);
-      return { publicImageUrl: null, storagePath: filePath };
+      const errObj = uploadResult.error as any;
+      console.error(`Supabase Storage upload error for bucket '${targetBucket}':`, {
+        message: errObj.message,
+        status: errObj.status,
+        statusCode: errObj.statusCode,
+      });
+      return {
+        publicImageUrl: null,
+        storagePath: filePath,
+        error: {
+          message: errObj.message || 'Storage upload failed',
+          status: errObj.status,
+          statusCode: errObj.statusCode,
+        },
+      };
     }
 
     const { data: publicUrlData } = supabase.storage.from(targetBucket).getPublicUrl(filePath);
@@ -99,9 +128,26 @@ export async function uploadMediaToSupabaseStorage(
 
     console.log('SUPABASE PUBLIC URL:', publicImageUrl);
 
-    return { publicImageUrl, storagePath: filePath };
-  } catch (err) {
-    console.warn('Failed to upload file to Supabase Storage:', err);
-    return null;
+    if (!publicImageUrl || !publicImageUrl.startsWith('https://')) {
+      console.warn('Invalid public URL generated from Supabase Storage:', publicImageUrl);
+      return {
+        publicImageUrl: null,
+        storagePath: filePath,
+        error: {
+          message: 'Generated public URL is not a valid HTTPS URL.',
+        },
+      };
+    }
+
+    return { publicImageUrl, storagePath: filePath, error: null };
+  } catch (err: any) {
+    console.error('Failed to upload file to Supabase Storage:', err);
+    return {
+      publicImageUrl: null,
+      storagePath: null,
+      error: {
+        message: err?.message || 'An unexpected error occurred during storage upload.',
+      },
+    };
   }
 }

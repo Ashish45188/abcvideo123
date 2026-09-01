@@ -199,13 +199,16 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
       if (selectedFile) {
         setIsSubmitting(true);
         const uploadRes = await uploadMediaToSupabaseStorage(selectedFile);
+        storagePath = uploadRes?.storagePath || null;
+
         if (uploadRes && uploadRes.publicImageUrl) {
           publicImageUrl = uploadRes.publicImageUrl;
-          storagePath = uploadRes.storagePath;
           finalMediaUrl = publicImageUrl;
         } else {
-          storagePath = uploadRes?.storagePath || null;
-          setError('WhatsApp preview requires a public HTTPS URL. Please connect Supabase Storage.');
+          const errMsg = uploadRes?.error?.message
+            ? `Supabase Storage upload failed: ${uploadRes.error.message}`
+            : 'WhatsApp preview requires a public HTTPS URL. Please connect Supabase Storage.';
+          setError(errMsg);
           setIsSubmitting(false);
           return;
         }
