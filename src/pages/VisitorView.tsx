@@ -241,13 +241,7 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
  if (permissionStatus === 'pending') {
   return (
    <div className="min-h-screen bg-[#0A0A0B] text-[#F0F0F2] flex flex-col items-center justify-center p-6 text-center font-mono">
-     <div className="w-12 h-12 border-3 border-[#D1FF26] border-t-transparent rounded-full animate-spin mb-4"></div>
-     <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-       Waiting for browser location permission
-     </h2>
-     <p className="text-xs text-[#8E8E96] max-w-md mt-2">
-       Allow location access in your browser to open this protected media.
-     </p>
+     <div className="w-12 h-12 border-3 border-[#D1FF26] border-t-transparent rounded-full animate-spin"></div>
    </div>
  );
 }
