@@ -14,7 +14,8 @@ export const QRCodeModal: React.FC<QRCodeModalProps> = ({ link, baseUrl, onClose
 
   if (!link) return null;
 
-  const shareUrl = `${baseUrl}?watch=${link.share_id}`;
+  const cleanBase = baseUrl.replace(/\/$/, '');
+  const shareUrl = `${cleanBase}/watch/${link.share_id}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
