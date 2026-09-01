@@ -64,53 +64,49 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 export async function uploadMediaToSupabaseStorage(file: File): Promise<string | null> {
+  console.log('Selected file:', file);
+
   const supabase = getSupabaseClient();
-  if (!supabase) return null;
+  if (!supabase) {
+    console.warn('Supabase client is not configured.');
+    return null;
+  }
 
   try {
     const targetBucket = 'whatsapp-thumbnails';
-
-    // Inspect existing buckets to reuse an available bucket or check whatsapp-thumbnails
-    let bucketToUse = targetBucket;
-    const { data: buckets, error: listBucketsError } = await supabase.storage.listBuckets();
-    if (!listBucketsError && buckets) {
-      const foundTarget = buckets.find((b) => b.name === targetBucket);
-      if (foundTarget) {
-        bucketToUse = foundTarget.name;
-      } else {
-        const foundMedia = buckets.find((b) => b.name === 'media');
-        if (foundMedia) {
-          bucketToUse = foundMedia.name;
-        } else {
-          // Attempt to create target bucket if permitted
-          const { error: createError } = await supabase.storage.createBucket(targetBucket, {
-            public: true,
-          });
-          if (!createError) {
-            bucketToUse = targetBucket;
-          }
-        }
-      }
-    }
-
     const ext = file.name.split('.').pop() || 'jpg';
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
     const filePath = `uploads/${fileName}`;
 
-    const { error } = await supabase.storage
-      .from(bucketToUse)
+    const uploadResult = await supabase.storage
+      .from(targetBucket)
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: true,
       });
 
-    if (error) {
-      console.warn(`Supabase Storage upload error for bucket '${bucketToUse}':`, error.message);
+    console.log('Supabase upload result:', uploadResult);
+
+    if (uploadResult.error) {
+      console.warn(`Supabase Storage upload error for bucket '${targetBucket}':`, uploadResult.error.message);
       return null;
     }
 
-    const { data: publicUrlData } = supabase.storage.from(bucketToUse).getPublicUrl(filePath);
-    return publicUrlData?.publicUrl || null;
+    const { data: publicUrlData } = supabase.storage.from(targetBucket).getPublicUrl(filePath);
+    const publicImageUrl = publicUrlData?.publicUrl || null;
+
+    console.log('Generated public image URL:', publicImageUrl);
+
+    if (
+      publicImageUrl &&
+      publicImageUrl.startsWith('https://') &&
+      !publicImageUrl.startsWith('blob:') &&
+      !publicImageUrl.startsWith('data:')
+    ) {
+      return publicImageUrl;
+    }
+
+    return publicImageUrl;
   } catch (err) {
     console.warn('Failed to upload file to Supabase Storage:', err);
     return null;
