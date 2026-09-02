@@ -33,6 +33,7 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
   const markersRef = useRef<Map<string, { marker: L.Marker; circle: L.Circle }>>(new Map());
   const historyPolylineRef = useRef<L.Polyline | null>(null);
   const startMarkerRef = useRef<L.Marker | null>(null);
+  const finalMarkerRef = useRef<L.Marker | null>(null);
   const historyMarkersRef = useRef<L.CircleMarker[]>([]);
 
   useEffect(() => {
@@ -277,6 +278,10 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
         startMarkerRef.current.remove();
         startMarkerRef.current = null;
       }
+      if (finalMarkerRef.current) {
+        finalMarkerRef.current.remove();
+        finalMarkerRef.current = null;
+      }
       historyMarkersRef.current.forEach((m) => m.remove());
       historyMarkersRef.current = [];
     };
@@ -295,8 +300,36 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
 
       clearLayers();
 
+      const startPoint = validHistory[0];
+      const endPoint = validHistory[validHistory.length - 1];
+
+      // 1. Draw Start Location Marker (Green)
+      const startMarkerHtml = `
+        <div class="relative flex items-center justify-center">
+          <div class="w-6 h-6 rounded-full bg-[#10B981] border-2 border-white shadow-lg flex items-center justify-center text-[10px] font-bold text-white font-mono">
+            S
+          </div>
+        </div>
+      `;
+      const startIcon = L.divIcon({
+        className: 'custom-start-marker',
+        html: startMarkerHtml,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+
+      const startMarker = L.marker([startPoint.latitude, startPoint.longitude], {
+        icon: startIcon,
+      }).addTo(map);
+
+      startMarker.bindTooltip(
+        `Start Location: ${formatTimestamp(locationHistory[0].created_at)}`,
+        { direction: 'top', offset: [0, -10] }
+      );
+      startMarkerRef.current = startMarker;
+
+      // 2. Draw RED road-matched polyline following actual roads, highways, curves, and turns
       if (routeResponse.ok && routeResponse.route.length > 1) {
-        // Draw RED road-matched polyline following actual roads, highways, curves, and turns
         const polyline = L.polyline(routeResponse.route, {
           color: '#EF4444', // Red road travel route
           weight: 5,
@@ -307,38 +340,44 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
 
         historyPolylineRef.current = polyline;
 
-        // Draw Start Location Marker
-        const startPoint = validHistory[0];
-        const startMarkerHtml = `
-          <div class="relative flex items-center justify-center">
-            <div class="w-5 h-5 rounded-full bg-[#10B981] border-2 border-white shadow-lg flex items-center justify-center text-[10px] font-bold text-white">
-              S
+        // Check if current session is stopped/completed to add Final Location marker
+        const selectedSess = sessions.find((s) => s.id === selectedSessionId);
+        const isStopped = selectedSess && selectedSess.status !== 'active';
+
+        if (isStopped && endPoint) {
+          const finalMarkerHtml = `
+            <div class="relative flex items-center justify-center">
+              <div class="w-6 h-6 rounded-full bg-[#EF4444] border-2 border-white shadow-lg flex items-center justify-center text-[10px] font-bold text-white font-mono">
+                F
+              </div>
             </div>
-          </div>
-        `;
-        const startIcon = L.divIcon({
-          className: 'custom-start-marker',
-          html: startMarkerHtml,
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-        });
+          `;
+          const finalIcon = L.divIcon({
+            className: 'custom-final-marker',
+            html: finalMarkerHtml,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+          });
 
-        const startMarker = L.marker([startPoint.latitude, startPoint.longitude], {
-          icon: startIcon,
-        }).addTo(map);
+          const finalMarker = L.marker([endPoint.latitude, endPoint.longitude], {
+            icon: finalIcon,
+          }).addTo(map);
 
-        startMarker.bindTooltip(
-          `Start Point: ${formatTimestamp(locationHistory[0].created_at)}`,
-          { direction: 'top', offset: [0, -8] }
-        );
-
-        startMarkerRef.current = startMarker;
-
-        // Fit bounds to encompass the entire road route if selecting
-        if (routeResponse.route.length > 1) {
-          const bounds = L.latLngBounds(routeResponse.route);
-          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+          finalMarker.bindTooltip(
+            `Final Location: ${formatTimestamp(locationHistory[locationHistory.length - 1].created_at)}`,
+            { direction: 'top', offset: [0, -10] }
+          );
+          finalMarkerRef.current = finalMarker;
         }
+
+        console.log('=== LIVE ROUTE DEBUG ===');
+        console.log('Road Route Generated: true');
+        console.log('Red Route Rendered: true');
+        console.log('Route Points:', routeResponse.route.length);
+
+        // Fit bounds to encompass the entire road route
+        const bounds = L.latLngBounds(routeResponse.route);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
 
         setRouteStats({
           distance: routeResponse.distance || 0,

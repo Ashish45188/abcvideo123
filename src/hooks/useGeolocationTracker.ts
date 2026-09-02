@@ -137,6 +137,15 @@ export function useGeolocationTracker({
         void db.touchVisitorSession(sessionId);
       }
 
+      const nextUpdateCount = state.updateCount + 1;
+
+      console.log('=== LIVE ROUTE DEBUG ===');
+      console.log('Permission: granted');
+      console.log('Session ID:', sessionId);
+      console.log('First Location:', nextUpdateCount === 1 ? 'received' : 'subsequent');
+      console.log('Location Saved:', isSaved);
+      console.log('Location Updates:', nextUpdateCount);
+
       setState((prev) => ({
         ...prev,
         latestLocation: payload,
