@@ -334,26 +334,6 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
 
         startMarkerRef.current = startMarker;
 
-        // Add small waypoints along the route for inspection
-        validHistory.forEach((u, index) => {
-          if (index > 0 && index < validHistory.length - 1) {
-            const circleMarker = L.circleMarker([u.latitude, u.longitude], {
-              radius: 3.5,
-              fillColor: '#EF4444',
-              color: '#000000',
-              weight: 1,
-              fillOpacity: 0.85,
-            }).addTo(map);
-
-            circleMarker.bindTooltip(
-              `Waypoint #${index + 1}: ${formatTimestamp((locationHistory[index] as LocationUpdate)?.created_at || Date.now())}`,
-              { direction: 'top', offset: [0, -4] }
-            );
-
-            historyMarkersRef.current.push(circleMarker);
-          }
-        });
-
         // Fit bounds to encompass the entire road route if selecting
         if (routeResponse.route.length > 1) {
           const bounds = L.latLngBounds(routeResponse.route);

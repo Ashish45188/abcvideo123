@@ -218,13 +218,12 @@ export async function fetchRoadRoute(
     console.error('Client OSRM fallback failed:', fallbackErr);
   }
 
-  // Direct points fallback if network unavailable
-  const fallbackPoints: [number, number][] = cleanPoints.map((p) => [p.latitude, p.longitude]);
   return {
-    ok: true,
-    route: fallbackPoints,
+    ok: false,
+    route: [],
     distance: 0,
     duration: 0,
-    provider: 'fallback-direct',
+    provider: 'none',
+    error: 'Road routing service unavailable',
   };
 }
