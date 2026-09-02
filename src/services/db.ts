@@ -195,6 +195,7 @@ export const db = {
       if (!videoUrl.trim()) {
         throw new Error('Please select a video file or provide a valid video stream URL.');
       }
+      const defaultVideoThumbnail = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80';
       newLink = {
         id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `link_${Date.now()}`,
         share_id: shareId,
@@ -202,7 +203,7 @@ export const db = {
         description: input.description?.trim() || null,
         media_type: 'video',
         media_url: videoUrl.trim(),
-        thumbnail_url: input.thumbnail_url?.trim() || null,
+        thumbnail_url: input.thumbnail_url?.trim() || defaultVideoThumbnail,
         active: true,
         created_at: new Date().toISOString(),
       };

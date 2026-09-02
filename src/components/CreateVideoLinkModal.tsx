@@ -225,7 +225,14 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const thumbnailUrl = mediaType === 'photo' ? finalMediaUrl : mediaType === 'pdf' ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80' : undefined;
+      const defaultVideoThumbnail = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80';
+      const thumbnailUrl = mediaType === 'photo'
+        ? finalMediaUrl
+        : mediaType === 'pdf'
+        ? 'https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=1200&q=80'
+        : mediaType === 'video'
+        ? defaultVideoThumbnail
+        : undefined;
       const previewImageUrl = thumbnailUrl || (mediaType === 'youtube' && videoId ? getYouTubeThumbnailUrl(videoId) : finalMediaUrl);
 
       console.log("=== WHATSAPP DEBUG ===");
