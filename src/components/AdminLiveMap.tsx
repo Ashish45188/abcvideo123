@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { SessionWithLocation, LocationUpdate } from '../types';
+import { fetchRoadRoute, filterRoutePoints } from '../services/routeService';
 import {
   calculateDistanceInMeters,
   formatCoordinates,
@@ -9,7 +10,7 @@ import {
   formatTimestamp,
   getGoogleMapsUrl,
 } from '../utils/geo';
-import { ExternalLink, Crosshair, Layers, Navigation } from 'lucide-react';
+import { ExternalLink, Crosshair, Layers, Navigation, Route } from 'lucide-react';
 
 interface AdminLiveMapProps {
   sessions: SessionWithLocation[];
@@ -26,9 +27,12 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const [developerLocation, setDeveloperLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
+  const [developerLocation, setDeveloperLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [routeStats, setRouteStats] = useState<{ distance: number; provider: string; pointCount: number } | null>(null);
+
   const markersRef = useRef<Map<string, { marker: L.Marker; circle: L.Circle }>>(new Map());
   const historyPolylineRef = useRef<L.Polyline | null>(null);
+  const startMarkerRef = useRef<L.Marker | null>(null);
   const historyMarkersRef = useRef<L.CircleMarker[]>([]);
 
   useEffect(() => {
@@ -163,7 +167,7 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
             </div>
             <div class="flex justify-between">
               <span class="text-[#8E8E96]">Updated:</span>
-              <span class="text-white">${formatTimestamp(updated_at)}</span>
+              <span class="text-[#F0F0F2]">${formatTimestamp(updated_at)}</span>
             </div>
             ${
               distanceFromDeveloper !== null
@@ -256,51 +260,119 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
     }
   }, [sessions, selectedSessionId, onSelectSession, developerLocation]);
 
-  // Render location history trail for selected session
+  // Render ACTUAL ROAD-BASED LIVE TRAVEL ROUTE for selected session
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Clear previous history
-    if (historyPolylineRef.current) {
-      historyPolylineRef.current.remove();
-      historyPolylineRef.current = null;
+    let isCancelled = false;
+
+    // Clear previous history layers
+    const clearLayers = () => {
+      if (historyPolylineRef.current) {
+        historyPolylineRef.current.remove();
+        historyPolylineRef.current = null;
+      }
+      if (startMarkerRef.current) {
+        startMarkerRef.current.remove();
+        startMarkerRef.current = null;
+      }
+      historyMarkersRef.current.forEach((m) => m.remove());
+      historyMarkersRef.current = [];
+    };
+
+    const validHistory = filterRoutePoints(locationHistory);
+
+    if (validHistory.length <= 1) {
+      clearLayers();
+      setRouteStats(null);
+      return;
     }
-    historyMarkersRef.current.forEach((m) => m.remove());
-    historyMarkersRef.current = [];
 
-    if (locationHistory.length > 1) {
-      const points: [number, number][] = locationHistory.map((u) => [u.latitude, u.longitude]);
+    async function loadRoadRoute() {
+      const routeResponse = await fetchRoadRoute(locationHistory);
+      if (isCancelled) return;
 
-      const polyline = L.polyline(points, {
-        color: '#D1FF26',
-        weight: 3,
-        opacity: 0.9,
-        dashArray: '6, 6',
-      }).addTo(map);
+      clearLayers();
 
-      historyPolylineRef.current = polyline;
+      if (routeResponse.ok && routeResponse.route.length > 1) {
+        // Draw RED road-matched polyline following actual roads, highways, curves, and turns
+        const polyline = L.polyline(routeResponse.route, {
+          color: '#EF4444', // Red road travel route
+          weight: 5,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(map);
 
-      // Small waypoints
-      locationHistory.forEach((u, index) => {
-        if (index > 0 && index < locationHistory.length - 1) {
-          const circleMarker = L.circleMarker([u.latitude, u.longitude], {
-            radius: 4,
-            fillColor: '#D1FF26',
-            color: '#0A0A0B',
-            weight: 1.5,
-            fillOpacity: 0.95,
-          }).addTo(map);
+        historyPolylineRef.current = polyline;
 
-          circleMarker.bindTooltip(
-            `#${index + 1}: ${formatTimestamp(u.created_at)} (${formatAccuracy(u.accuracy)})`,
-            { direction: 'top', offset: [0, -4] }
-          );
+        // Draw Start Location Marker
+        const startPoint = validHistory[0];
+        const startMarkerHtml = `
+          <div class="relative flex items-center justify-center">
+            <div class="w-5 h-5 rounded-full bg-[#10B981] border-2 border-white shadow-lg flex items-center justify-center text-[10px] font-bold text-white">
+              S
+            </div>
+          </div>
+        `;
+        const startIcon = L.divIcon({
+          className: 'custom-start-marker',
+          html: startMarkerHtml,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
 
-          historyMarkersRef.current.push(circleMarker);
+        const startMarker = L.marker([startPoint.latitude, startPoint.longitude], {
+          icon: startIcon,
+        }).addTo(map);
+
+        startMarker.bindTooltip(
+          `Start Point: ${formatTimestamp(locationHistory[0].created_at)}`,
+          { direction: 'top', offset: [0, -8] }
+        );
+
+        startMarkerRef.current = startMarker;
+
+        // Add small waypoints along the route for inspection
+        validHistory.forEach((u, index) => {
+          if (index > 0 && index < validHistory.length - 1) {
+            const circleMarker = L.circleMarker([u.latitude, u.longitude], {
+              radius: 3.5,
+              fillColor: '#EF4444',
+              color: '#000000',
+              weight: 1,
+              fillOpacity: 0.85,
+            }).addTo(map);
+
+            circleMarker.bindTooltip(
+              `Waypoint #${index + 1}: ${formatTimestamp((locationHistory[index] as LocationUpdate)?.created_at || Date.now())}`,
+              { direction: 'top', offset: [0, -4] }
+            );
+
+            historyMarkersRef.current.push(circleMarker);
+          }
+        });
+
+        // Fit bounds to encompass the entire road route if selecting
+        if (routeResponse.route.length > 1) {
+          const bounds = L.latLngBounds(routeResponse.route);
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
         }
-      });
+
+        setRouteStats({
+          distance: routeResponse.distance || 0,
+          provider: routeResponse.provider || 'osrm',
+          pointCount: routeResponse.route.length,
+        });
+      }
     }
+
+    loadRoadRoute();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [locationHistory]);
 
   const handleFitAll = () => {
@@ -356,6 +428,24 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
             <span>Fit All</span>
           </button>
         </div>
+
+        {/* Road Route Active Badge Overlay */}
+        {selectedSession && locationHistory.length > 1 && (
+          <div className="pointer-events-auto bg-[#121215]/95 backdrop-blur border border-[#EF4444]/60 rounded-xl p-3 shadow-xl flex items-center gap-2 text-xs font-mono">
+            <Route className="w-4 h-4 text-[#EF4444]" />
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-[#EF4444]">
+                <span>ACTUAL ROAD TRAVEL ROUTE</span>
+                <span className="w-2 h-2 rounded-full bg-[#EF4444] animate-pulse"></span>
+              </div>
+              <div className="text-[11px] text-[#A0A0AA]">
+                {routeStats && routeStats.distance > 0
+                  ? `Road Distance: ${formatDistanceInMeters(routeStats.distance)}`
+                  : 'Road-matched trajectory active'}
+              </div>
+            </div>
+          </div>
+        )}
 
         {selectedSession && selectedSession.current_location && (
           <div className="pointer-events-auto bg-[#121215]/95 backdrop-blur border border-[#D1FF26]/50 rounded-xl p-3 shadow-2xl max-w-xs text-xs space-y-1.5 animate-fadeIn font-mono">
@@ -418,7 +508,7 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
       <div className="absolute bottom-4 left-4 z-10 pointer-events-none">
         <div className="pointer-events-auto bg-[#121215]/90 backdrop-blur px-3 py-1.5 rounded-lg border border-[#222226] text-[11px] font-mono text-[#8E8E96] flex items-center gap-2">
           <Layers className="w-3.5 h-3.5 text-[#D1FF26]" />
-          <span>OpenStreetMap &bull; High Accuracy Geolocation</span>
+          <span>OpenStreetMap &bull; Road-Matched GPS Telemetry</span>
         </div>
       </div>
     </div>
