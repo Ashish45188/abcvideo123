@@ -173,18 +173,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenVisitorVie
   };
 
   // Compute Stats
-  // A session's status can stay 'active' forever if a visitor just closes
-  // the tab (no browser event marks it stopped). Treat sessions with no
-  // location update in the last 90s as stale so they stop being counted
-  // as "active" and don't overlap with genuinely live sessions.
+  // Disconnect failsafe: if last_seen > 15 seconds ago and status is still active,
+  // admin considers the visitor disconnected/location sharing stopped.
   const isSessionLive = (s: SessionWithLocation) => {
     if (s.status !== 'active') return false;
     const lastSeenTime = Math.max(
       new Date(s.last_seen || s.created_at).getTime(),
       new Date(s.current_location?.updated_at || s.created_at).getTime()
     );
-    return Date.now() - lastSeenTime < STALE_SESSION_THRESHOLD_MS;
+    const secondsSinceLastSeen = (Date.now() - lastSeenTime) / 1000;
+    const isLive = secondsSinceLastSeen <= 15;
+
+    console.log('=== ADMIN DISCONNECT DETECTION ===');
+    console.log('sessionId:', s.id);
+    console.log('last_seen:', s.last_seen || s.created_at);
+    console.log('seconds_since_last_seen:', Math.round(secondsSinceLastSeen));
+    console.log('new_status:', isLive ? 'active (LIVE 🟢)' : 'disconnected / stopped (🔴)');
+
+    return isLive;
   };
+
   const activeSessionsList = sessions.filter(isSessionLive);
   const uniqueActiveVisitors = new Set(activeSessionsList.map((s) => s.visitor_id)).size;
 

@@ -144,6 +144,79 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
     },
   });
 
+  // Browser/Tab exit detection
+  useEffect(() => {
+    if (!session?.id) return;
+
+    let hasNotifiedDisconnect = false;
+
+    const notifyDisconnect = (eventType: string) => {
+      if (hasNotifiedDisconnect) return;
+      hasNotifiedDisconnect = true;
+
+      console.log('=== VISITOR EXIT DETECTED ===');
+      console.log('event type:', eventType);
+      console.log('sessionId:', session.id);
+
+      const payload = JSON.stringify({ sessionId: session.id });
+      const endpoint = '/api/session-disconnect';
+
+      let beaconSent = false;
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        try {
+          const blob = new Blob([payload], { type: 'application/json' });
+          beaconSent = navigator.sendBeacon(endpoint, blob);
+        } catch (err) {
+          console.warn('sendBeacon failed:', err);
+        }
+      }
+
+      if (!beaconSent && typeof fetch !== 'undefined') {
+        try {
+          fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        } catch (err) {
+          console.warn('keepalive fetch failed:', err);
+        }
+      }
+
+      void db.updateVisitorSessionStatus(
+        session.id,
+        'stopped_by_visitor',
+        'Browser tab/window closed by visitor'
+      );
+    };
+
+    const handlePageHide = (event: PageTransitionEvent) => {
+      notifyDisconnect(`pagehide (persisted: ${event.persisted})`);
+    };
+
+    const handleBeforeUnload = () => {
+      notifyDisconnect('beforeunload');
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        console.log('=== VISITOR VISIBILITY CHANGED ===');
+        console.log('Page hidden, keeping active unless tab/window closes.');
+      }
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [session?.id]);
+
   // Handle User Clicks "Stop Sharing"
   const handleStopSharing = async () => {
     setIsStopping(true);
