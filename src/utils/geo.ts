@@ -130,3 +130,68 @@ export function isAccuracyPoor(accuracy?: number | null): boolean {
   if (accuracy === undefined || accuracy === null) return false;
   return accuracy > 50; // Threshold for warning message
 }
+
+/**
+ * Calculate cumulative distance across consecutive geographic coordinates in meters.
+ */
+export function calculateCumulativeDistance(
+  points: Array<{ latitude: number; longitude: number }>
+): number {
+  if (!Array.isArray(points) || points.length < 2) return 0;
+
+  let totalMeters = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    if (
+      p1 &&
+      p2 &&
+      !isNaN(p1.latitude) &&
+      !isNaN(p1.longitude) &&
+      !isNaN(p2.latitude) &&
+      !isNaN(p2.longitude)
+    ) {
+      totalMeters += calculateDistanceInMeters(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+    }
+  }
+
+  return totalMeters;
+}
+
+/**
+ * Format time duration between start and end timestamps into human readable string.
+ */
+export function formatDuration(
+  startIsoOrMs?: string | number | Date | null,
+  endIsoOrMs?: string | number | Date | null
+): string {
+  if (!startIsoOrMs) return 'N/A';
+
+  try {
+    const start = new Date(startIsoOrMs).getTime();
+    const end = endIsoOrMs ? new Date(endIsoOrMs).getTime() : Date.now();
+    const diffMs = Math.max(0, end - start);
+
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 60) return `${seconds} sec${seconds === 1 ? '' : 's'}`;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} min${minutes === 1 ? '' : 's'}`;
+
+    const hours = Math.floor(minutes / 60);
+    const remainingMins = minutes % 60;
+    if (hours < 24) {
+      return remainingMins > 0
+        ? `${hours} hr${hours === 1 ? '' : 's'} ${remainingMins} min${remainingMins === 1 ? '' : 's'}`
+        : `${hours} hr${hours === 1 ? '' : 's'}`;
+    }
+
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours > 0
+      ? `${days} day${days === 1 ? '' : 's'} ${remainingHours} hr${remainingHours === 1 ? '' : 's'}`
+      : `${days} day${days === 1 ? '' : 's'}`;
+  } catch {
+    return 'N/A';
+  }
+}

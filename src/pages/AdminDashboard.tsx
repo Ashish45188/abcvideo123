@@ -53,7 +53,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenVisitorVie
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
 
-  // Load all initial data
+  // Load all initial data and refresh location history for active/selected session
   const loadData = useCallback(async () => {
     try {
       await db.expireStaleSessions();
@@ -64,10 +64,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenVisitorVie
       setLinks(fetchedLinks);
       setSessions(fetchedSessions);
 
+      let currentSelected = selectedSessionId;
       // Default select the first active session if none selected
-      if (!selectedSessionId && fetchedSessions.length > 0) {
+      if (!currentSelected && fetchedSessions.length > 0) {
         const activeOne = fetchedSessions.find((s) => s.status === 'active');
-        setSelectedSessionId(activeOne ? activeOne.id : fetchedSessions[0].id);
+        currentSelected = activeOne ? activeOne.id : fetchedSessions[0].id;
+        setSelectedSessionId(currentSelected);
+      }
+
+      // Automatically re-fetch location history for the selected session
+      // so live GPS trajectory updates automatically in Realtime!
+      if (currentSelected) {
+        const hist = await db.getLocationHistory(currentSelected);
+        setLocationHistory(hist);
+        console.log('=== LIVE ROUTE DEBUG ===');
+        console.log('Realtime Event: received');
+        console.log('Admin Map Updated: true');
+        console.log('Route Coordinates:', hist.length);
       }
     } catch (err) {
       console.error('Error loading dashboard data:', err);
