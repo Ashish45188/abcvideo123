@@ -17,9 +17,8 @@ const LOCAL_LINKS_KEY = 'geovideo_local_video_links';
 const LOCAL_SESSIONS_KEY = 'geovideo_local_visitor_sessions';
 const LOCAL_UPDATES_KEY = 'geovideo_local_location_updates';
 const LOCAL_CURRENT_KEY = 'geovideo_local_current_locations';
-// Mobile browsers can pause timers while a tab is backgrounded. Keep a
-// generous grace period so an active share is not hidden during that pause.
-export const STALE_SESSION_THRESHOLD_MS = 30 * 60 * 1000;
+// Disconnect detection threshold: 15 seconds missing heartbeat = disconnected / stale session
+export const STALE_SESSION_THRESHOLD_MS = 15 * 1000;
 
 // BroadcastChannel for instant cross-tab sync in local mode
 const localChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window

@@ -295,15 +295,26 @@ export function useGeolocationTracker({
   }, [isActive, sessionId]);
 
   // Keep the session alive even when the device is stationary and the browser
-  // does not emit a new geolocation callback.
+  // does not emit a new geolocation callback. Sends heartbeat every 5 seconds.
   useEffect(() => {
     if (!isActive || !sessionId) return;
 
+    // Initial touch on active
+    console.log('=== SESSION HEARTBEAT ===');
+    console.log('sessionId:', sessionId);
+    console.log('timestamp:', new Date().toISOString());
+    console.log('status: active');
+    void db.touchVisitorSession(sessionId);
+
     const heartbeat = window.setInterval(() => {
       if (!isStoppedRef.current) {
+        console.log('=== SESSION HEARTBEAT ===');
+        console.log('sessionId:', sessionId);
+        console.log('timestamp:', new Date().toISOString());
+        console.log('status: active');
         void db.touchVisitorSession(sessionId);
       }
-    }, 10000);
+    }, 5000);
 
     return () => window.clearInterval(heartbeat);
   }, [isActive, sessionId]);

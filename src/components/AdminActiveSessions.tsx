@@ -108,7 +108,45 @@ export const AdminActiveSessions: React.FC<AdminActiveSessionsProps> = ({
               {sessions.map((session) => {
                 const isSelected = selectedSessionId === session.id;
                 const loc = session.current_location;
-                const isActive = session.status === 'active';
+                const lastSeenTime = Math.max(
+                  new Date(session.last_seen || session.created_at).getTime(),
+                  new Date(session.current_location?.updated_at || session.created_at).getTime()
+                );
+                const secondsSinceLastSeen = (Date.now() - lastSeenTime) / 1000;
+                const isLive = session.status === 'active' && secondsSinceLastSeen <= 15;
+                const isDisconnected = session.status === 'stopped_by_visitor' || (session.status === 'active' && !isLive);
+
+                let statusBadge = (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase bg-[#141810] text-[#D1FF26] border border-[#304018]">
+                    🟢 LIVE
+                  </span>
+                );
+
+                if (session.status === 'stopped_by_admin') {
+                  statusBadge = (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase bg-rose-950/40 text-rose-400 border border-rose-800/50">
+                      🔴 STOPPED
+                    </span>
+                  );
+                } else if (session.status === 'permission_denied') {
+                  statusBadge = (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase bg-amber-950/40 text-amber-400 border border-amber-800/50">
+                      🟡 DENIED
+                    </span>
+                  );
+                } else if (session.status === 'waiting') {
+                  statusBadge = (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase bg-amber-950/40 text-amber-400 border border-amber-800/50">
+                      🟡 INACTIVE
+                    </span>
+                  );
+                } else if (isDisconnected) {
+                  statusBadge = (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase bg-rose-950/40 text-rose-400 border border-rose-800/50">
+                      🔴 DISCONNECTED
+                    </span>
+                  );
+                }
 
                 return (
                   <tr
@@ -197,15 +235,14 @@ export const AdminActiveSessions: React.FC<AdminActiveSessionsProps> = ({
 
                     {/* Status */}
                     <td className="py-4 px-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-mono font-bold tracking-wider uppercase border ${
-                          isActive
-                            ? 'bg-[#141810] text-[#D1FF26] border-[#304018]'
-                            : 'bg-[#18181C] text-[#8E8E96] border-[#2A2A30]'
-                        }`}
-                      >
-                        {session.status.replace(/_/g, ' ').toUpperCase()}
-                      </span>
+                      <div className="space-y-1">
+                        <div>{statusBadge}</div>
+                        {isDisconnected && (
+                          <div className="text-[10px] text-rose-400 font-sans">
+                            {session.stop_reason || 'Location sharing stopped / Browser connection lost'}
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* Actions */}
@@ -229,7 +266,7 @@ export const AdminActiveSessions: React.FC<AdminActiveSessionsProps> = ({
                           <span>History</span>
                         </button>
 
-                        {isActive && (
+                        {isLive && (
                           <button
                             onClick={() => handleStop(session.id)}
                             disabled={stoppingId === session.id}

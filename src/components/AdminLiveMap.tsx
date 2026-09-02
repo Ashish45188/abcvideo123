@@ -473,10 +473,19 @@ export const AdminLiveMap: React.FC<AdminLiveMapProps> = ({
                 <Navigation className="w-3.5 h-3.5 text-[#D1FF26]" />
                 {selectedSession.visitor_id}
               </span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#141810] text-[#D1FF26] border border-[#304018] font-bold uppercase tracking-wider">
-                {selectedSession.status}
+              <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold uppercase tracking-wider ${
+                selectedSession.status === 'active'
+                  ? 'bg-[#141810] text-[#D1FF26] border-[#304018]'
+                  : 'bg-rose-950/40 text-rose-400 border-rose-800/50'
+              }`}>
+                {selectedSession.status === 'active' ? '🟢 LIVE' : '🔴 DISCONNECTED'}
               </span>
             </div>
+            {selectedSession.status !== 'active' && (
+              <div className="text-[10px] text-rose-400 font-sans font-medium">
+                Location sharing stopped
+              </div>
+            )}
             <div className="flex justify-between text-[#C4C4C8]">
               <span className="text-[#8E8E96]">Coordinates:</span>
               <span className="font-mono text-white font-medium">
