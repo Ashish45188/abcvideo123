@@ -19,6 +19,7 @@ import {
   FileImage,
   FileText,
   Share2,
+  MessageSquare,
   ExternalLink,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -294,6 +295,13 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const handleSmsShare = () => {
+    if (!shareUrl) return;
+    const message = `Please open this link: ${shareUrl}`;
+    const smsUrl = `sms:?body=${encodeURIComponent(message)}`;
+    window.location.href = smsUrl;
+  };
+
   const getItemThumbnail = (link: VideoLink) => {
     if (link.thumbnail_url) return link.thumbnail_url;
     if (link.media_type === 'photo' && link.media_url) return link.media_url;
@@ -355,21 +363,30 @@ export const CreateVideoLinkModal: React.FC<CreateVideoLinkModalProps> = ({
                   Shareable URL:
                 </span>
                 <p className="text-xs text-[#D1FF26] font-mono truncate mb-2">{shareUrl}</p>
-                <div className="flex items-center gap-2">
+                <div className="space-y-2">
                   <button
                     onClick={handleCopy}
-                    className="flex-1 py-2 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    className="w-full py-2 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
                     {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Copied' : 'Copy Link'}</span>
                   </button>
-                  <button
-                    onClick={handleWhatsAppShare}
-                    className="flex-1 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md"
-                  >
-                    <Share2 className="w-3.5 h-3.5" />
-                    <span>Share on WhatsApp</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleWhatsAppShare}
+                      className="flex-1 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Share on WhatsApp</span>
+                    </button>
+                    <button
+                      onClick={handleSmsShare}
+                      className="flex-1 py-2 bg-[#34B7F1] hover:bg-[#2aa2d8] text-black rounded-lg text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Share via SMS</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

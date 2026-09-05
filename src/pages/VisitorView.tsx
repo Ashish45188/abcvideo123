@@ -239,21 +239,21 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
 
   if (loadingLink) {
     return (
-      <div className="min-h-screen bg-[#0A0A0B] flex flex-col items-center justify-center p-6 text-center font-mono">
-        <div className="w-12 h-12 border-3 border-[#D1FF26] border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-xs uppercase tracking-wider text-[#8E8E96]">LOADING REQUESTED VIDEO DETAILS...</p>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center font-mono">
+        <div className="w-12 h-12 border-3 border-lime-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-xs uppercase tracking-wider text-slate-500">LOADING REQUESTED VIDEO DETAILS...</p>
       </div>
     );
   }
 
   if (!videoLink || !videoLink.active) {
     return (
-      <div className="min-h-screen bg-[#0A0A0B] flex flex-col items-center justify-center p-6 text-center font-mono">
-        <div className="w-16 h-16 rounded-2xl bg-[#121215] border border-[#222226] flex items-center justify-center text-[#D1FF26] mb-4 shadow-xl">
-          <AlertTriangle className="w-8 h-8 text-[#D1FF26]" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center font-mono">
+        <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-amber-500 mb-4 shadow-xl">
+          <AlertTriangle className="w-8 h-8 text-amber-500" />
         </div>
-        <h2 className="text-xl font-bold uppercase tracking-wider text-white">VIDEO LINK UNAVAILABLE</h2>
-        <p className="text-xs text-[#8E8E96] max-w-md mt-2 font-sans">
+        <h2 className="text-xl font-bold uppercase tracking-wider text-slate-900">VIDEO LINK UNAVAILABLE</h2>
+        <p className="text-xs text-slate-600 max-w-md mt-2 font-sans">
           This video link may have expired, been deactivated, or the URL ID ({shareId}) is invalid.
         </p>
       </div>
@@ -273,25 +273,25 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
   // --- STATE 1: Visitor Declined Consent ---
   if (consentDecision === 'declined') {
     return (
-      <div className="min-h-screen bg-[#0A0A0B] text-[#F0F0F2] flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
-        <div className="w-full max-w-lg bg-[#121215] border border-[#222226] rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-rose-950/40 border border-rose-800/60 mx-auto flex items-center justify-center text-rose-400 shadow-inner">
+      <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+        <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 mx-auto flex items-center justify-center text-rose-600 shadow-inner">
             <XCircle className="w-8 h-8" />
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-xl font-bold uppercase tracking-wider text-white font-mono">ACCESS RESTRICTED</h2>
-            <p className="text-xs text-rose-300 font-mono">
+            <h2 className="text-xl font-bold uppercase tracking-wider text-slate-900 font-mono">ACCESS RESTRICTED</h2>
+            <p className="text-xs text-rose-600 font-mono">
               Location sharing was declined, so the {mediaLabel.toLowerCase()} cannot be opened.
             </p>
           </div>
 
-          <div className="bg-[#0A0A0B] rounded-2xl p-4 border border-[#222226] text-xs text-[#8E8E96] text-left space-y-2 font-mono">
-            <div className="flex items-center gap-2 font-bold text-white uppercase tracking-wider">
-              <Shield className="w-4 h-4 text-[#D1FF26]" />
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs text-slate-600 text-left space-y-2 font-mono">
+            <div className="flex items-center gap-2 font-bold text-slate-900 uppercase tracking-wider">
+              <Shield className="w-4 h-4 text-lime-600" />
               <span>Strict Privacy Policy</span>
             </div>
-            <p className="font-sans text-[#A0A0A8]">
+            <p className="font-sans text-slate-600">
               Your browser denied location access, so "{videoLink.custom_name}" cannot be opened.
               Allow location access to continue.
             </p>
@@ -300,9 +300,9 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
               onClick={handleRequestLocationAgain}
-              className="flex-1 py-3 px-4 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+              className="flex-1 py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition shadow-lg flex items-center justify-center gap-2 cursor-pointer"
             >
-              <ShieldCheck className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4 text-lime-400" />
               Allow
             </button>
           </div>
@@ -313,36 +313,36 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
 
  if (permissionStatus === 'pending') {
   return (
-   <div className="min-h-screen bg-[#0A0A0B] text-[#F0F0F2] flex flex-col items-center justify-center p-6 text-center font-mono">
-     <div className="w-12 h-12 border-3 border-[#D1FF26] border-t-transparent rounded-full animate-spin"></div>
+   <div className="min-h-screen bg-white text-slate-800 flex flex-col items-center justify-center p-6 text-center font-mono">
+     <div className="w-12 h-12 border-3 border-lime-500 border-t-transparent rounded-full animate-spin"></div>
    </div>
  );
 }
   // --- STATE 2: Consent Gate Screen ---
   if (false) {
     return (
-      <div className="min-h-screen bg-[#0A0A0B] text-[#F0F0F2] flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
-        <div className="w-full max-w-xl mb-4 flex items-center justify-between text-xs text-[#8E8E96] font-mono">
+      <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+        <div className="w-full max-w-xl mb-4 flex items-center justify-between text-xs text-slate-500 font-mono">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#D1FF26]"></div>
-            <span className="font-bold text-white uppercase tracking-wider">GeoVideo Tracker</span>
+            <div className="w-2 h-2 rounded-full bg-lime-500"></div>
+            <span className="font-bold text-slate-900 uppercase tracking-wider">GeoVideo Tracker</span>
           </div>
-          <span className="bg-[#121215] px-2.5 py-1 rounded-lg border border-[#222226]">
-            VISITOR: <span className="font-mono text-[#D1FF26]">{visitorId}</span>
+          <span className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
+            VISITOR: <span className="font-mono text-slate-900">{visitorId}</span>
           </span>
         </div>
 
-        <div className="w-full max-w-xl bg-[#121215] border border-[#222226] rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-          <div className="space-y-2 pb-4 border-b border-[#222226]">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#141810] border border-[#304018] text-[#D1FF26] text-[10px] font-mono font-bold uppercase tracking-widest">
+        <div className="w-full max-w-xl bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="space-y-2 pb-4 border-b border-slate-200">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-lime-50 border border-lime-200 text-lime-800 text-[10px] font-mono font-bold uppercase tracking-widest">
               {mediaType === 'photo' ? (
                 <>
-                  <ImageIcon className="w-3 h-3 text-[#D1FF26]" />
+                  <ImageIcon className="w-3 h-3 text-lime-700" />
                   <span>PROTECTED PHOTO</span>
                 </>
               ) : mediaType === 'video' ? (
                 <>
-                  <Film className="w-3 h-3 text-[#D1FF26]" />
+                  <Film className="w-3 h-3 text-lime-700" />
                   <span>PROTECTED DIRECT VIDEO</span>
                 </>
               ) : (
@@ -352,31 +352,31 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
                 </>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-sans">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-sans">
               {videoLink.custom_name}
             </h1>
             {videoLink.description && (
-              <p className="text-sm text-[#8E8E96] leading-relaxed">{videoLink.description}</p>
+              <p className="text-sm text-slate-600 leading-relaxed">{videoLink.description}</p>
             )}
           </div>
 
-          <div className="bg-[#0A0A0B] rounded-2xl p-5 border border-[#222226] space-y-3 font-mono">
-            <div className="flex items-center gap-2 text-[#D1FF26] font-bold text-xs uppercase tracking-wider">
-              <ShieldCheck className="w-5 h-5 text-[#D1FF26]" />
+          <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 space-y-3 font-mono">
+            <div className="flex items-center gap-2 text-lime-700 font-bold text-xs uppercase tracking-wider">
+              <ShieldCheck className="w-5 h-5 text-lime-600" />
               <span>Location Consent Notice</span>
             </div>
-            <p className="text-xs text-[#D0D0D5] leading-relaxed font-sans">
+            <p className="text-xs text-slate-700 leading-relaxed font-sans">
               {mediaType === 'photo'
                 ? 'To view this high-resolution photo, you can share your current device location with the website owner. Your latitude, longitude, accuracy and location updates will be collected while location sharing is active.'
                 : 'To watch this video, you can share your current device location with the website owner. Your latitude, longitude, accuracy and location updates will be collected while location sharing is active.'}
             </p>
-            <div className="pt-2 border-t border-[#18181C] grid grid-cols-2 gap-2 text-[11px] text-[#8E8E96]">
+            <div className="pt-2 border-t border-slate-200 grid grid-cols-2 gap-2 text-[11px] text-slate-600">
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#D1FF26]" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-lime-600" />
                 <span>High GPS accuracy</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#D1FF26]" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-lime-600" />
                 <span>Stop anytime with 1-click</span>
               </div>
             </div>
@@ -385,30 +385,30 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
               onClick={() => handleRequestLocationAgain()}
-              className="flex-1 py-3.5 px-5 bg-[#D1FF26] hover:bg-[#bfe822] text-black rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition duration-150 shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+              className="flex-1 py-3.5 px-5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition duration-150 shadow-lg flex items-center justify-center gap-2 cursor-pointer"
             >
               {mediaType === 'photo' ? (
                 <>
-                  <ImageIcon className="w-4 h-4" />
+                  <ImageIcon className="w-4 h-4 text-lime-400" />
                   Allow &amp; View Photo
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 fill-current" />
+                  <Play className="w-4 h-4 fill-current text-lime-400" />
                   Allow &amp; Watch Video
                 </>
               )}
             </button>
             <button
               onClick={() => setConsentDecision('declined')}
-              className="py-3.5 px-5 bg-[#18181C] hover:bg-[#222228] text-[#8E8E96] hover:text-white rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition border border-[#2A2A30] flex items-center justify-center gap-2 cursor-pointer"
+              className="py-3.5 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-mono font-bold uppercase tracking-wider text-xs transition border border-slate-300 flex items-center justify-center gap-2 cursor-pointer"
             >
               <XCircle className="w-4 h-4" />
               Decline
             </button>
           </div>
 
-          <p className="text-[11px] text-center text-[#71717A] font-mono">
+          <p className="text-[11px] text-center text-slate-500 font-mono">
             Location collection only begins after explicit browser permission is granted.
           </p>
         </div>
@@ -418,9 +418,9 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
 
   // --- STATE 3: Allowed & Watching/Viewing Media ---
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-[#F0F0F2] flex flex-col p-4 sm:p-6 lg:p-8 font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-5xl w-full mx-auto space-y-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-white">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
           {videoLink.custom_name}
         </h1>
 
