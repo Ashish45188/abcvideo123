@@ -169,6 +169,7 @@ export function useGeolocationTracker({
     (err: GeolocationPositionError) => {
       let errorMessage = 'An unknown geolocation error occurred.';
       let status: SessionStatus = 'location_unavailable';
+      const isFatal = err.code === err.PERMISSION_DENIED;
 
       switch (err.code) {
         case err.PERMISSION_DENIED:
@@ -180,7 +181,7 @@ export function useGeolocationTracker({
           status = 'location_unavailable';
           break;
         case err.TIMEOUT:
-          errorMessage = 'Location request timed out. Please try again.';
+          errorMessage = 'Location request timed out. Retrying...';
           status = 'location_unavailable';
           break;
       }
@@ -189,10 +190,12 @@ export function useGeolocationTracker({
         ...prev,
         error: errorMessage,
         isAcquiringInitial: false,
-        isTracking: false,
+        // For temporary GPS errors (TIMEOUT / POSITION_UNAVAILABLE), keep tracking active!
+        // Preserve latestLocation and bestLocation so last known location remains visible.
+        isTracking: isFatal ? false : prev.isTracking,
       }));
 
-      if (sessionId && status === 'permission_denied') {
+      if (sessionId && isFatal) {
         db.updateVisitorSessionStatus(sessionId, status, errorMessage);
       }
       if (onStatusChange) {
@@ -252,33 +255,60 @@ export function useGeolocationTracker({
     }
 
     isStoppedRef.current = false;
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
     setState((prev) => ({
       ...prev,
-      isAcquiringInitial: true,
+      isTracking: true,
+      isAcquiringInitial: prev.latestLocation === null,
       error: null,
       warning: null,
       stoppedByAdmin: false,
     }));
 
-    // Get a fast initial fix so the map can show coordinates immediately.
+    // Start watchPosition immediately so tracking is always active
+    const watchId = navigator.geolocation.watchPosition(
+      processPosition,
+      handlePositionError,
+      geoOptions
+    );
+    watchIdRef.current = watchId;
+
+    // Also attempt a fast initial fix in parallel to populate location faster
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        processPosition(pos);
-
-        // Continue with high-accuracy updates after the first fix.
         if (!isStoppedRef.current) {
-          const watchId = navigator.geolocation.watchPosition(
-            processPosition,
-            handlePositionError,
-            geoOptions
-          );
-          watchIdRef.current = watchId;
+          processPosition(pos);
         }
       },
-      handlePositionError,
+      (err) => {
+        // Log fast fix failure without stopping watchPosition
+        console.warn('Initial fast geolocation fix failed, watchPosition continuing:', err.message);
+        if (err.code === err.PERMISSION_DENIED) {
+          handlePositionError(err);
+        }
+      },
       initialGeoOptions
     );
   }, [processPosition, handlePositionError]);
+
+  // Automatically reconnect/resume tracking when network comes back online
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('=== NETWORK RECONNECTED === Resuming tracking...');
+      if (isActive && sessionId && !isStoppedRef.current) {
+        startTracking();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [isActive, sessionId, startTracking]);
 
   // Effect to trigger tracking when isActive and sessionId are present
   useEffect(() => {

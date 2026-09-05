@@ -173,8 +173,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenVisitorVie
   };
 
   // Compute Stats
-  // Disconnect failsafe: if last_seen > 15 seconds ago and status is still active,
-  // admin considers the visitor disconnected/location sharing stopped.
   const isSessionLive = (s: SessionWithLocation) => {
     if (s.status !== 'active') return false;
     const lastSeenTime = Math.max(
@@ -182,23 +180,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenVisitorVie
       new Date(s.current_location?.updated_at || s.created_at).getTime()
     );
     const secondsSinceLastSeen = (Date.now() - lastSeenTime) / 1000;
-    const isLive = secondsSinceLastSeen <= 15;
-
-    console.log('=== ADMIN DISCONNECT DETECTION ===');
-    console.log('sessionId:', s.id);
-    console.log('last_seen:', s.last_seen || s.created_at);
-    console.log('seconds_since_last_seen:', Math.round(secondsSinceLastSeen));
-    console.log('new_status:', isLive ? 'active (LIVE 🟢)' : 'disconnected / stopped (🔴)');
-
-    return isLive;
+    return secondsSinceLastSeen <= 15;
   };
 
-  const activeSessionsList = sessions.filter(isSessionLive);
-  const uniqueActiveVisitors = new Set(activeSessionsList.map((s) => s.visitor_id)).size;
+  const liveSessionsList = sessions.filter(isSessionLive);
+
+  // Sessions to display on map and session feed: retain sessions with valid last known location
+  // so markers do not disappear during temporary GPS/network delays.
+  const activeSessionsList = sessions.filter((s) => {
+    if (s.status === 'stopped_by_admin' || s.status === 'stopped_by_visitor') return false;
+    return s.status === 'active' || s.status === 'location_unavailable' || s.status === 'waiting' || s.current_location !== null;
+  });
+
+  const uniqueActiveVisitors = new Set(liveSessionsList.map((s) => s.visitor_id)).size;
 
   const stats: DashboardStats = {
     totalLinks: links.length,
-    activeSessions: activeSessionsList.length,
+    activeSessions: liveSessionsList.length,
     totalSessions: sessions.length,
     activeVisitors: uniqueActiveVisitors,
   };
