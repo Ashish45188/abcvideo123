@@ -59,7 +59,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-white text-slate-900 selection:bg-indigo-500 selection:text-white">
       {visitorShareId ? (
         <VisitorView
           shareId={visitorShareId}
