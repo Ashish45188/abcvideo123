@@ -421,12 +421,14 @@ export const db = {
   async touchVisitorSession(sessionId: string): Promise<void> {
     const now = new Date().toISOString();
     const supabase = getSupabaseClient();
+    const allowedStatuses = ['active', 'location_unavailable', 'waiting', 'expired'];
+
     if (supabase) {
       const { error } = await supabase
         .from('visitor_sessions')
         .update({ last_seen: now, status: 'active' })
         .eq('id', sessionId)
-        .in('status', ['active', 'location_unavailable', 'waiting']);
+        .in('status', allowedStatuses);
       if (error) {
         console.warn('Failed to refresh visitor session heartbeat:', error.message);
       }
@@ -434,7 +436,7 @@ export const db = {
 
     const sessions = getLocalData<VisitorSession[]>(LOCAL_SESSIONS_KEY, []);
     const updated = sessions.map((s) =>
-      s.id === sessionId && ['active', 'location_unavailable', 'waiting'].includes(s.status)
+      s.id === sessionId && allowedStatuses.includes(s.status)
         ? { ...s, last_seen: now, status: 'active' }
         : s
     );
@@ -559,7 +561,7 @@ export const db = {
         .from('visitor_sessions')
         .update({ last_seen: now, status: 'active' })
         .eq('id', sessionId)
-        .in('status', ['active', 'location_unavailable', 'waiting']);
+        .in('status', ['active', 'location_unavailable', 'waiting', 'expired']);
 
       return { updateId };
     }
