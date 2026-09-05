@@ -417,6 +417,17 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
   }
 
   // --- STATE 3: Allowed & Watching/Viewing Media ---
+  if (mediaType === 'photo') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <PhotoViewer
+          src={videoLink.media_url || videoLink.thumbnail_url || ''}
+          title={videoLink.custom_name}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-5xl w-full mx-auto space-y-6">
@@ -426,12 +437,7 @@ export const VisitorView: React.FC<VisitorViewProps> = ({ shareId }) => {
 
         {/* Media Player / Viewer */}
         <div className="space-y-3">
-          {mediaType === 'photo' ? (
-            <PhotoViewer
-              src={videoLink.media_url || videoLink.thumbnail_url || ''}
-              title={videoLink.custom_name}
-            />
-          ) : mediaType === 'pdf' ? (
+          {mediaType === 'pdf' ? (
             <PdfViewer
               src={videoLink.media_url || ''}
               title={videoLink.custom_name}
