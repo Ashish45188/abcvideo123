@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
   Film,
   Share2,
+  MessageSquare,
 } from 'lucide-react';
 
 interface AdminLinksListProps {
@@ -56,6 +57,13 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
     const url = getPublicShareUrl(shareId);
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(url)}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleSmsShare = (shareId: string) => {
+    const url = getPublicShareUrl(shareId);
+    const message = `Please open this link: ${url}`;
+    const smsUrl = `sms:?body=${encodeURIComponent(message)}`;
+    window.location.href = smsUrl;
   };
 
   const getMediaThumbnail = (link: VideoLink) => {
@@ -278,6 +286,16 @@ export const AdminLinksList: React.FC<AdminLinksListProps> = ({
                   >
                     <Share2 className="w-3.5 h-3.5" />
                     <span>WhatsApp</span>
+                  </button>
+
+                  {/* Share via SMS */}
+                  <button
+                    onClick={() => handleSmsShare(link.share_id)}
+                    className="px-3 py-1.5 bg-[#34B7F1] hover:bg-[#2aa2d8] text-black rounded-xl text-xs font-mono font-bold border border-[#34B7F1] flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    title="Share item via SMS"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>SMS</span>
                   </button>
 
                   {/* QR Code trigger */}
